@@ -1,46 +1,163 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
-// Setup type definitions for built-in Supabase Runtime APIs
 import "@supabase/functions-js/edge-runtime.d.ts";
-import { withSupabase } from "@supabase/server";
 
-console.log("Hello from Functions!");
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
-// This endpoint uses 'publishable' | 'secret' access, apiKey is required.
-// Use publishable for Client-facing, key-validated endpoints
-// Use secret for Server-to-server, internal calls
-export default {
-  fetch: withSupabase({ auth: ["publishable", "secret"] }, async (req, ctx) => {
-    // Called by another service with a secret key
-    // ctx.supabaseAdmin bypasses RLS — use for privileged operations
-    /*
-    if (ctx.authMode === "secret") {
-      const { user_id } = await req.json();
-      const { data } = await ctx.supabaseAdmin.auth.admin.getUserById(user_id);
+const GEMINI_MODEL = "gemini-3-flash-preview";
 
-      return Response.json({
-        email: data?.user?.email,
-      });
+const schema = {
+  type: "object",
+  properties: {
+    tema: {
+      type: "string",
+      description: "El tema principal que el estudiante quiere estudiar."
+    },
+    conceptos: {
+      type: "array",
+      description: "Conceptos relacionados con el tema y sus prerrequisitos.",
+      items: {
+        type: "object",
+        properties: {
+          nombre: {
+            type: "string",
+            description: "Nombre del concepto."
+          },
+          requiere: {
+            type: "array",
+            description: "Conceptos que deben conocerse antes de estudiar este concepto.",
+            items: {
+              type: "string"
+            }
+          }
+        },
+        required: ["nombre", "requiere"]
+      }
     }
-    */
-
-    const { name } = await req.json();
-
-    return Response.json({
-      message: `Hello ${name}!`,
-    });
-  }),
+  },
+  required: ["tema", "conceptos"]
 };
 
-/* To invoke locally:
+Deno.serve(async (req: Request) => {
+  try {
+    // Verificar que exista la API key
+    if (!GEMINI_API_KEY) {
+      return Response.json(
+        {
+          error: "GEMINI_API_KEY no está configurada en Supabase."
+        },
+        { status: 500 }
+      );
+    }
 
-  1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
-  2. Make an HTTP request:
+    // Obtener el tema enviado por la aplicación
+    const body = await req.json();
+    const tema = body.tema;
 
-  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/generar-mapa' \
-    --header 'apiKey: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH' \
-    --data '{"name":"Functions"}'
+    if (!tema || typeof tema !== "string") {
+      return Response.json(
+        {
+          error: "Debes enviar un tema válido."
+        },
+        { status: 400 }
+      );
+    }
 
-*/
+    // Prompt para Gemini
+    const prompt = `
+Eres un asistente educativo especializado en organizar temas de estudio.
+
+El estudiante quiere estudiar el siguiente tema:
+
+"${tema}"
+
+Analiza el tema y crea un mapa de conocimiento.
+
+Debes identificar entre 5 y 10 conceptos importantes relacionados con el tema.
+
+Para cada concepto indica qué otros conceptos deberían conocerse antes de estudiarlo.
+
+Reglas:
+- El concepto principal debe aparecer.
+- Los prerrequisitos deben ser conceptos que realmente ayuden a comprender el concepto.
+- No repitas conceptos.
+- Si un concepto no necesita prerrequisitos, devuelve una lista vacía.
+- Mantén los nombres de los conceptos cortos y claros.
+- No agregues explicaciones fuera del JSON.
+`;
+
+    // Llamar a Gemini
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: schema
+          }
+        })
+      }
+    );
+
+    // Si Gemini devuelve un error
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      console.error("Error de Gemini:", errorText);
+
+      return Response.json(
+        {
+          error: "Gemini devolvió un error.",
+          details: errorText
+        },
+        { status: 500 }
+      );
+    }
+
+    const result = await response.json();
+
+    // Obtener el texto generado por Gemini
+    const generatedText =
+      result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!generatedText) {
+      return Response.json(
+        {
+          error: "Gemini no devolvió contenido."
+        },
+        { status: 500 }
+      );
+    }
+
+    // Convertir la respuesta JSON de Gemini
+    const mapa = JSON.parse(generatedText);
+
+    // Devolver el mapa a Mentalis
+    return Response.json(mapa);
+
+  } catch (error) {
+    console.error("Error en generar-mapa:", error);
+
+    return Response.json(
+      {
+        error: "Ocurrió un error al generar el mapa.",
+        details: error instanceof Error
+          ? error.message
+          : String(error)
+      },
+      { status: 500 }
+    );
+  }
+});

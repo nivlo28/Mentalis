@@ -1,27 +1,69 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { supabase } from '../services/supabase';
 
 export default function InicioScreen({ navigation }) {
-  // Guarda lo que el usuario va escribiendo en el input
   const [tema, setTema] = useState('');
+  const [cargando, setCargando] = useState(false);
 
-  // Se ejecuta al tocar el botón "Crear mapa"
-  const handleCrearMapa = () => {
-    // Validación simple: no dejar crear un mapa con el campo vacío
+  const handleCrearMapa = async () => {
     if (tema.trim() === '') {
-      alert('Escribí un tema primero');
+      Alert.alert('Tema requerido', 'Escribí un tema primero');
       return;
     }
-    // Navega a VerMapa, pasándole el tema escrito como parámetro
-    navigation.navigate('VerMapa', { tema: tema });
+
+    try {
+      setCargando(true);
+
+      console.log('Generando mapa para:', tema);
+
+      const { data, error } = await supabase.functions.invoke(
+        'generar-mapa',
+        {
+          body: {
+            tema: tema.trim(),
+          },
+        }
+      );
+
+      if (error) {
+        console.error('Error llamando a generar-mapa:', error);
+
+        Alert.alert(
+          'Error',
+          'No se pudo generar el mapa. Revisá la conexión.'
+        );
+
+        return;
+      }
+
+      console.log('Mapa generado:', data);
+
+      navigation.navigate('VerMapa', {
+        tema: tema.trim(),
+        mapa: data,
+      });
+
+    } catch (error) {
+      console.error('Error inesperado:', error);
+
+      Alert.alert(
+        'Error',
+        'Ocurrió un problema al generar el mapa.'
+      );
+    } finally {
+      setCargando(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.titulo}>Mentalis</Text>
-      <Text style={styles.subtitulo}>¿Qué tema querés estudiar?</Text>
 
-      {/* Input controlado: value y onChangeText conectados al estado 'tema' */}
+      <Text style={styles.subtitulo}>
+        ¿Qué tema querés estudiar?
+      </Text>
+
       <TextInput
         style={styles.input}
         placeholder="Ej: Derivadas, Listas Enlazadas..."
@@ -29,7 +71,11 @@ export default function InicioScreen({ navigation }) {
         onChangeText={setTema}
       />
 
-      <Button title="Crear mapa" onPress={handleCrearMapa} />
+      <Button
+        title={cargando ? 'Generando mapa...' : 'Crear mapa'}
+        onPress={handleCrearMapa}
+        disabled={cargando}
+      />
     </View>
   );
 }
@@ -37,20 +83,23 @@ export default function InicioScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center', // centra verticalmente
+    justifyContent: 'center',
     padding: 20,
   },
+
   titulo: {
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 10,
   },
+
   subtitulo: {
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 20,
   },
+
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
