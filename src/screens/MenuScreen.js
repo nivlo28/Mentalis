@@ -1,108 +1,227 @@
-import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
-
-// Datos de ejemplo (hardcodeados), mientras se conecta Supabase
-// que va a traer los mapas reales guardados por el usuario
-const mapasEjemplo = [
-  { id: '1', tema: 'Derivadas', fecha: '10 de agosto' },
-  { id: '2', tema: 'Listas Enlazadas', fecha: '8 de agosto' },
-  { id: '3', tema: 'Fotosíntesis', fecha: '5 de agosto' },
-];
+import React, { useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../services/supabase';
 
 export default function MenuScreen({ navigation }) {
+  const [mapas, setMapas] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
-  // Se ejecuta cuando el usuario toca un mapa de la lista
-  // Navega a la pantalla VerMapa, pasándole el tema de ese mapa
-  const handleAbrirMapa = (mapa) => {
-    navigation.navigate('VerMapa', { tema: mapa.tema });
+  const obtenerMapas = async () => {
+    try {
+      setCargando(true);
+      
+      const { data, error } = await supabase
+        .from('mapas')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.log('Error obteniendo mapas:', error.message);
+      } else {
+        setMapas(data || []);
+      }
+    } catch (e) {
+      console.log('Error:', e);
+    } finally {
+      setCargando(false);
+    }
   };
 
-  // Se ejecuta cuando el usuario toca el botón "+ Crear nuevo mapa"
-  // Navega a la pantalla Inicio, donde escribe el tema nuevo
+  useFocusEffect(
+    useCallback(() => {
+      obtenerMapas();
+    }, [])
+  );
+
+  const handleAbrirMapa = (mapa) => {
+    navigation.navigate('VerMapa', { tema: mapa.tema, mapaId: mapa.id });
+  };
+
   const handleCrearNuevo = () => {
     navigation.navigate('Inicio');
   };
 
+  const handleIrAPerfil = () => {
+    navigation.navigate('Perfil');
+  };
+
   return (
     <View style={styles.container}>
+      {/* Encabezado con título y botón de perfil estilo Badge */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.subtituloHeader}>Bienvenido</Text>
+          <Text style={styles.titulo}>Mis Mapas</Text>
+        </View>
 
-      {/* Título fijo arriba de la pantalla */}
-      <Text style={styles.titulo}>Mis Mapas</Text>
+        <TouchableOpacity 
+          style={styles.botonPerfil} 
+          onPress={handleIrAPerfil}
+          activeOpacity={0.7}
+        >
+          <View style={styles.avatarIcono}>
+            <Text style={styles.avatarTexto}>👤</Text>
+          </View>
+          <Text style={styles.botonPerfilTexto}>Perfil</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* FlatList: componente de React Native para mostrar listas largas.
-          Es más eficiente que un .map() normal porque solo renderiza
-          lo que se ve en pantalla, no toda la lista de una vez */}
-      <FlatList
-        data={mapasEjemplo} // el array que se va a recorrer
-        keyExtractor={(item) => item.id} // identificador único por elemento (obligatorio en FlatList)
+      {/* Indicador de carga o Lista */}
+      {cargando ? (
+        <View style={styles.centrado}>
+          <ActivityIndicator size="large" color="#2563EB" />
+        </View>
+      ) : (
+        <FlatList
+          data={mapas}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={styles.item} 
+              onPress={() => handleAbrirMapa(item)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.itemTema}>{item.tema}</Text>
+              {item.created_at && (
+                <Text style={styles.itemFecha}>
+                  {new Date(item.created_at).toLocaleDateString()}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <View style={styles.vacioContainer}>
+              <Text style={styles.vacio}>Todavía no tenés mapas creados</Text>
+            </View>
+          }
+        />
+      )}
 
-        // renderItem: cómo se dibuja CADA elemento de la lista
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.item} onPress={() => handleAbrirMapa(item)}>
-            <Text style={styles.itemTema}>{item.tema}</Text>
-            <Text style={styles.itemFecha}>{item.fecha}</Text>
-          </TouchableOpacity>
-        )}
-
-        // Qué mostrar si el array está vacío (todavía no hay mapas creados)
-        ListEmptyComponent={
-          <Text style={styles.vacio}>Todavía no tenés mapas creados</Text>
-        }
-      />
-
-      {/* Botón fijo abajo para crear un mapa nuevo */}
-      <TouchableOpacity style={styles.botonNuevo} onPress={handleCrearNuevo}>
+      {/* Botón flotante/destacado para crear nuevo mapa */}
+      <TouchableOpacity 
+        style={styles.botonNuevo} 
+        onPress={handleCrearNuevo}
+        activeOpacity={0.8}
+      >
         <Text style={styles.botonTexto}>+ Crear nuevo mapa</Text>
       </TouchableOpacity>
-
     </View>
   );
 }
 
-// Estilos separados al final (así se acostumbra en React Native,
-// para no mezclar diseño con la lógica de arriba)
 const styles = StyleSheet.create({
   container: {
-    flex: 1,        // ocupa toda la pantalla disponible
-    padding: 20,
-    paddingTop: 60, // más espacio arriba, para no pegarse a la barra de estado
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    backgroundColor: '#F8FAFC',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  subtituloHeader: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   titulo: {
     fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  // --- Estilos del Botón de Perfil Mejorado ---
+  botonPerfil: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    // Sombra suave para darle elevación
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  avatarIcono: {
+    marginRight: 6,
+  },
+  avatarTexto: {
+    fontSize: 14,
+  },
+  botonPerfilTexto: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  // ------------------------------------------
+  centrado: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   item: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 18,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10, // separación entre cada tarjeta de la lista
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
   },
   itemTema: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   itemFecha: {
-    fontSize: 13,
-    color: '#666', // gris, para que se note menos que el título
-    marginTop: 4,
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 6,
+  },
+  vacioContainer: {
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  vacioEmoji: {
+    fontSize: 40,
+    marginBottom: 10,
   },
   vacio: {
     textAlign: 'center',
-    color: '#666',
-    marginTop: 30,
+    color: '#64748B',
+    fontSize: 15,
   },
   botonNuevo: {
-    backgroundColor: '#333',
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#2563EB', // Azul moderno y vistoso
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 20,
     marginTop: 10,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   botonTexto: {
-    color: '#fff',
+    color: '#FFFFFF',
     textAlign: 'center',
-    fontWeight: 'bold',
+    fontWeight: '700',
     fontSize: 16,
   },
 });
