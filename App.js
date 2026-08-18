@@ -7,11 +7,10 @@ import { supabase } from './src/services/supabase';
 
 import LoginScreen from './src/screens/LoginScreen';
 import RegistroScreen from './src/screens/RegistroScreen';
-import MenuScreen from './src/screens/MenuScreen';
-import InicioScreen from './src/screens/InicioScreen';
 import VerMapaScreen from './src/screens/VerMapaScreen';
 import QuizScreen from './src/screens/QuizScreen';
-import PerfilScreen from './src/screens/PerfilScreen';
+
+import TabNavigator from './src/navigation/TabNavigator';
 
 const Stack = createNativeStackNavigator();
 
@@ -23,6 +22,7 @@ export default function App() {
     async function revisarSesion() {
       try {
         const { data, error } = await supabase.auth.getSession();
+
         if (!error) {
           setHaySesion(!!data.session);
         }
@@ -35,7 +35,9 @@ export default function App() {
 
     revisarSesion();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setHaySesion(!!session);
     });
 
@@ -46,9 +48,18 @@ export default function App() {
 
   if (cargando) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={{ marginTop: 10 }}>Cargando...</Text>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <ActivityIndicator size="large" color="#8B5CF6" />
+
+        <Text style={{ marginTop: 10 }}>
+          Cargando...
+        </Text>
       </View>
     );
   }
@@ -58,16 +69,37 @@ export default function App() {
       <Stack.Navigator>
         {haySesion ? (
           <>
-            <Stack.Screen name="Menu" component={MenuScreen} options={{ title: 'Mentalis' }} />
-            <Stack.Screen name="Perfil" component={PerfilScreen} options={{ title: 'Mi Perfil' }} />
-            <Stack.Screen name="Inicio" component={InicioScreen} options={{ title: 'Nuevo mapa' }} />
-            <Stack.Screen name="VerMapa" component={VerMapaScreen} options={{ title: 'Tu Mapa' }} />
-            <Stack.Screen name="Quiz" component={QuizScreen} options={{ title: 'Repaso' }} />
+            <Stack.Screen
+              name="Menu"
+              component={TabNavigator}
+              options={{ headerShown: false }}
+            />
+
+            <Stack.Screen
+              name="VerMapa"
+              component={VerMapaScreen}
+              options={{ title: 'Tu Mapa' }}
+            />
+
+            <Stack.Screen
+              name="Quiz"
+              component={QuizScreen}
+              options={{ title: 'Repaso' }}
+            />
           </>
         ) : (
           <>
-            <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Iniciar sesión' }} />
-            <Stack.Screen name="Registro" component={RegistroScreen} options={{ title: 'Crear cuenta' }} />
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ title: 'Iniciar sesión' }}
+            />
+
+            <Stack.Screen
+              name="Registro"
+              component={RegistroScreen}
+              options={{ title: 'Crear cuenta' }}
+            />
           </>
         )}
       </Stack.Navigator>
