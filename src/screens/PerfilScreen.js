@@ -1,116 +1,81 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Button, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { supabase } from '../services/supabase';
 
-export default function PerfilScreen() {
-  const [usuario, setUsuario] = useState(null);
-  const [cargando, setCargando] = useState(true);
+export default function PerfilScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [mapasCreados, setMapasCreados] = useState(0);
+  const [sesionesCompletadas, setSesionesCompletadas] = useState(0);
 
   useEffect(() => {
-    async function obtenerDatosUsuario() {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) {
-          Alert.alert('Error', 'No se pudieron cargar los datos del perfil.');
-        } else {
-          setUsuario(user);
-        }
-      } catch (e) {
-        console.log('Error de perfil:', e);
-      } finally {
-        setCargando(false);
-      }
-    }
-
-    obtenerDatosUsuario();
+    cargarPerfil();
   }, []);
 
-  const handleCerrarSesion = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      Alert.alert('Error', error.message);
+  const cargarPerfil = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setEmail(user.email);
     }
+
+    const { count: countMapas } = await supabase
+      .from('mapas')
+      .select('*', { count: 'exact', head: true });
+    setMapasCreados(countMapas || 0);
+
+    const { count: countSesiones } = await supabase
+      .from('sesiones_estudio')
+      .select('*', { count: 'exact', head: true });
+    setSesionesCompletadas(countSesiones || 0);
   };
 
-  if (cargando) {
-    return (
-      <View style={styles.centrado}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
-  }
+  const handleCerrarSesion = async () => {
+    await supabase.auth.signOut();
+    navigation.navigate('Login');
+  };
 
   return (
-    <View style={styles.container}>
-      {/* Sección Superior: Información Personal */}
-      <View style={styles.infoContainer}>
-        <Text style={styles.titulo}>Mi Perfil</Text>
+    <ScrollView style={styles.container}>
+      <Text style={styles.titulo}>Perfil</Text>
 
-        <View style={styles.tarjeta}>
-          <Text style={styles.label}>Correo Electrónico:</Text>
-          <Text style={styles.valor}>{usuario?.email ?? 'No disponible'}</Text>
+      <Text style={styles.correo}>{email}</Text>
 
-          <Text style={styles.label}>ID de Usuario:</Text>
-          <Text style={styles.valor}>{usuario?.id ?? 'No disponible'}</Text>
-        </View>
+      <View style={styles.item}>
+        <Text style={styles.etiqueta}>Mapas creados</Text>
+        <Text style={styles.valor}>{mapasCreados}</Text>
       </View>
 
-      {/* Sección Inferior: Botón de Cerrar Sesión */}
-      <View style={styles.botonContainer}>
-        <Button 
-          title="Cerrar sesión" 
-          color="#dc3545" 
-          onPress={handleCerrarSesion} 
-        />
+      <View style={styles.item}>
+        <Text style={styles.etiqueta}>Sesiones completadas</Text>
+        <Text style={styles.valor}>{sesionesCompletadas}</Text>
       </View>
-    </View>
+
+      <TouchableOpacity style={styles.boton} onPress={handleCerrarSesion}>
+        <Text style={styles.botonTexto}>Cerrar sesión</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'space-between', // Empuja el contenido hacia arriba y abajo
-    backgroundColor: '#f8f9fa',
+  container: { flex: 1, padding: 20, paddingTop: 60 },
+  titulo: { fontSize: 28, fontWeight: 'bold', marginBottom: 10 },
+  correo: { fontSize: 14, color: '#666', marginBottom: 20 },
+  item: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  centrado: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoContainer: {
+  etiqueta: { fontSize: 16 },
+  valor: { fontSize: 16, fontWeight: 'bold' },
+  boton: {
+    backgroundColor: '#333',
+    padding: 15,
+    borderRadius: 8,
     marginTop: 20,
   },
-  titulo: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
-  },
-  tarjeta: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  label: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginTop: 10,
-    fontWeight: '600',
-  },
-  valor: {
-    fontSize: 16,
-    color: '#212529',
-    marginTop: 2,
-  },
-  botonContainer: {
-    marginBottom: 30, // Separación del borde inferior de la pantalla
-  },
+  botonTexto: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
 });

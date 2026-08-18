@@ -23,15 +23,11 @@ export default function App() {
     async function revisarSesion() {
       try {
         const { data, error } = await supabase.auth.getSession();
-
-        if (error) {
-          console.log('❌ Error conectando con Supabase:', error);
-        } else {
-          console.log('✅ Supabase conectado correctamente');
+        if (!error) {
           setHaySesion(!!data.session);
         }
       } catch (error) {
-        console.log('❌ Error:', error);
+        console.log('Error:', error);
       } finally {
         setCargando(false);
       }
@@ -39,10 +35,7 @@ export default function App() {
 
     revisarSesion();
 
-    // Listener para cambios de autenticación
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setHaySesion(!!session);
     });
 
@@ -64,47 +57,17 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator>
         {haySesion ? (
-          // Pantallas accesibles solo cuando hay usuario autenticado
           <>
-            <Stack.Screen
-              name="Menu"
-              component={MenuScreen}
-              options={{ title: 'Mentalis' }}
-            />
-            <Stack.Screen
-              name="Perfil"
-              component={PerfilScreen}
-              options={{ title: 'Mi Perfil' }}
-            />
-            <Stack.Screen
-              name="Inicio"
-              component={InicioScreen}
-              options={{ title: 'Nuevo mapa' }}
-            />
-            <Stack.Screen
-              name="VerMapa"
-              component={VerMapaScreen}
-              options={{ title: 'Tu Mapa' }}
-            />
-            <Stack.Screen
-              name="Quiz"
-              component={QuizScreen}
-              options={{ title: 'Repaso' }}
-            />
+            <Stack.Screen name="Menu" component={MenuScreen} options={{ title: 'Mentalis' }} />
+            <Stack.Screen name="Perfil" component={PerfilScreen} options={{ title: 'Mi Perfil' }} />
+            <Stack.Screen name="Inicio" component={InicioScreen} options={{ title: 'Nuevo mapa' }} />
+            <Stack.Screen name="VerMapa" component={VerMapaScreen} options={{ title: 'Tu Mapa' }} />
+            <Stack.Screen name="Quiz" component={QuizScreen} options={{ title: 'Repaso' }} />
           </>
         ) : (
-          // Pantallas de autenticación
           <>
-            <Stack.Screen
-              name="Login"
-              component={LoginScreen}
-              options={{ title: 'Iniciar sesión' }}
-            />
-            <Stack.Screen
-              name="Registro"
-              component={RegistroScreen}
-              options={{ title: 'Crear cuenta' }}
-            />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Iniciar sesión' }} />
+            <Stack.Screen name="Registro" component={RegistroScreen} options={{ title: 'Crear cuenta' }} />
           </>
         )}
       </Stack.Navigator>
