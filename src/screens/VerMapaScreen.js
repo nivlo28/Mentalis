@@ -1,21 +1,57 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
+
+import ListaEnlazada from '../estructuras/ListaEnlazada';
 
 export default function VerMapaScreen({ route }) {
   const { tema, mapa } = route.params;
 
+  // Creamos una lista enlazada con los conceptos generados por Gemini
+  const conceptos = useMemo(() => {
+    const lista = new ListaEnlazada();
+
+    if (mapa?.conceptos) {
+      mapa.conceptos.forEach((concepto) => {
+        lista.insertarFinal(concepto);
+      });
+    }
+
+    console.log(
+      'Lista enlazada:',
+      lista.recorrer()
+    );
+
+    console.log(
+      'Cantidad de nodos:',
+      lista.obtenerLongitud()
+    );
+
+    return lista.recorrer();
+  }, [mapa]);
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
+
       <Text style={styles.titulo}>
         Mapa de: {tema}
       </Text>
 
       <Text style={styles.subtitulo}>
-        Conceptos generados por Gemini
+        Conceptos organizados con Lista Enlazada
       </Text>
 
-      {mapa?.conceptos?.map((concepto, index) => (
+      {conceptos.map((concepto, index) => (
         <View key={index} style={styles.concepto}>
+
+          <Text style={styles.numero}>
+            Nodo {index + 1}
+          </Text>
+
           <Text style={styles.nombre}>
             {concepto.nombre}
           </Text>
@@ -29,14 +65,16 @@ export default function VerMapaScreen({ route }) {
               Sin prerrequisitos
             </Text>
           )}
+
         </View>
       ))}
 
-      {!mapa?.conceptos && (
+      {conceptos.length === 0 && (
         <Text style={styles.error}>
           No se recibieron conceptos.
         </Text>
       )}
+
     </ScrollView>
   );
 }
@@ -67,6 +105,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 10,
+  },
+
+  numero: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
   },
 
   nombre: {

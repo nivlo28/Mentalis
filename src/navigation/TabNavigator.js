@@ -1,44 +1,75 @@
 import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+import {
+  createBottomTabNavigator,
+} from '@react-navigation/bottom-tabs';
+
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import MenuScreen from '../screens/MenuScreen';
 import InicioScreen from '../screens/InicioScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 
+import {
+  useTheme,
+} from '../context/ThemeContext';
+
 const Tab = createBottomTabNavigator();
 
 export default function TabNavigator() {
+  const {
+    theme,
+  } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
 
-        tabBarActiveTintColor: '#8B5CF6',
-        tabBarInactiveTintColor: '#888',
+        tabBarActiveTintColor: theme.primary,
+
+        tabBarInactiveTintColor:
+          theme.secondaryText,
 
         tabBarStyle: {
           height: 75,
           paddingBottom: 12,
           paddingTop: 8,
-          backgroundColor: '#0F172A',
-          borderTopWidth: 0,
-        },
-        
 
-        tabBarIcon: ({ color, size }) => {
+          backgroundColor: theme.tabBar,
+
+          borderTopWidth: 1,
+          borderTopColor: theme.border,
+        },
+
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
+
+        tabBarIcon: ({
+          color,
+          size,
+          focused,
+        }) => {
           let iconName = 'home-outline';
 
           if (route.name === 'Inicio') {
-            iconName = 'home-outline';
+            iconName = focused
+              ? 'home'
+              : 'home-outline';
           }
 
           if (route.name === 'Mapas') {
-            iconName = 'map-outline';
+            iconName = focused
+              ? 'map'
+              : 'map-outline';
           }
 
           if (route.name === 'Perfil') {
-            iconName = 'person-outline';
+            iconName = focused
+              ? 'person'
+              : 'person-outline';
           }
 
           return (
@@ -53,12 +84,12 @@ export default function TabNavigator() {
     >
       <Tab.Screen
         name="Inicio"
-        component={MenuScreen}
+        component={InicioScreen}
       />
 
       <Tab.Screen
         name="Mapas"
-        component={InicioScreen}
+        component={MenuScreen}
       />
 
       <Tab.Screen
