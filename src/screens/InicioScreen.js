@@ -23,6 +23,10 @@ import {
   useTheme,
 } from '../context/ThemeContext';
 
+import HeaderMentalis from '../components/HeaderMentalis';
+import MapaCard from '../components/MapaCard';
+import ProgressCard from '../components/ProgressCard';
+
 export default function InicioScreen({
   navigation,
 }) {
@@ -34,7 +38,7 @@ export default function InicioScreen({
   } = useTheme();
 
   const handleCrearMapa = async () => {
-    if (tema.trim() === '') {
+    if (!tema.trim()) {
       Alert.alert(
         'Tema requerido',
         'Escribe un tema primero'
@@ -45,11 +49,6 @@ export default function InicioScreen({
 
     try {
       setCargando(true);
-
-      console.log(
-        'Generando mapa para:',
-        tema
-      );
 
       const {
         data,
@@ -64,11 +63,6 @@ export default function InicioScreen({
       );
 
       if (error) {
-        console.error(
-          'Error generando mapa:',
-          error
-        );
-
         Alert.alert(
           'Error',
           'No se pudo generar el mapa.'
@@ -77,29 +71,66 @@ export default function InicioScreen({
         return;
       }
 
-      console.log(
-        'Mapa generado:',
-        data
-      );
+      const {
+        data: {
+          user,
+        },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        Alert.alert(
+          'Error',
+          'No se pudo identificar tu usuario.'
+        );
+
+        return;
+      }
+
+      const {
+        data: mapaGuardado,
+        error: errorGuardar,
+      } = await supabase
+        .from('mapas')
+        .insert({
+          tema: tema.trim(),
+          contenido: data,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (errorGuardar) {
+        console.log(
+          'Error guardando mapa:',
+          errorGuardar
+        );
+
+        Alert.alert(
+          'Error',
+          'El mapa se generó pero no se pudo guardar.'
+        );
+
+        return;
+      }
 
       navigation.navigate(
         'VerMapa',
         {
-          tema: tema.trim(),
-          mapa: data,
+          tema: mapaGuardado.tema,
+          mapa: mapaGuardado.contenido,
         }
       );
 
       setTema('');
     } catch (error) {
-      console.error(
-        'Error inesperado:',
+      console.log(
+        'Error:',
         error
       );
 
       Alert.alert(
         'Error',
-        'Ocurrió un problema al generar el mapa.'
+        'Ocurrió un problema inesperado.'
       );
     } finally {
       setCargando(false);
@@ -117,81 +148,8 @@ export default function InicioScreen({
       contentContainerStyle={styles.contenido}
       showsVerticalScrollIndicator={false}
     >
-      {/* LOGO */}
-      <View style={styles.logoContainer}>
-        <View
-          style={[
-            styles.logoIcono,
-            {
-              backgroundColor:
-                theme.primarySoft,
-            },
-          ]}
-        >
-          <Ionicons
-            name="bulb-outline"
-            size={23}
-            color={theme.primary}
-          />
-        </View>
+      <HeaderMentalis />
 
-        <Text
-          style={[
-            styles.logo,
-            {
-              color: theme.text,
-            },
-          ]}
-        >
-          Mentalis
-        </Text>
-      </View>
-
-      {/* SALUDO */}
-      <View style={styles.header}>
-        <View style={styles.saludoContainer}>
-          <Text
-            style={[
-              styles.saludo,
-              {
-                color: theme.text,
-              },
-            ]}
-          >
-            ¡Hola! 👋
-          </Text>
-
-          <Text
-            style={[
-              styles.pregunta,
-              {
-                color:
-                  theme.secondaryText,
-              },
-            ]}
-          >
-            ¿Qué tema quieres estudiar hoy?
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.notificacion,
-            {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name="notifications-outline"
-            size={21}
-            color={theme.text}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* GENERADOR */}
       <View style={styles.generador}>
         <TextInput
           style={[
@@ -218,24 +176,14 @@ export default function InicioScreen({
               backgroundColor:
                 theme.primary,
             },
-
-            cargando &&
-              styles.botonDeshabilitado,
           ]}
           onPress={handleCrearMapa}
           disabled={cargando}
-          activeOpacity={0.8}
         >
           {cargando ? (
-            <View style={styles.filaBoton}>
-              <ActivityIndicator
-                color="#FFFFFF"
-              />
-
-              <Text style={styles.textoBoton}>
-                Generando...
-              </Text>
-            </View>
+            <ActivityIndicator
+              color="#FFFFFF"
+            />
           ) : (
             <View style={styles.filaBoton}>
               <Ionicons
@@ -252,7 +200,6 @@ export default function InicioScreen({
         </TouchableOpacity>
       </View>
 
-      {/* RECIENTES */}
       <View style={styles.tituloSeccion}>
         <Text
           style={[
@@ -271,41 +218,35 @@ export default function InicioScreen({
           }
         >
           <Text
-            style={[
-              styles.verTodos,
-              {
-                color: theme.primary,
-              },
-            ]}
+            style={{
+              color: theme.primary,
+              fontWeight: '600',
+            }}
           >
             Ver todos
           </Text>
         </TouchableOpacity>
       </View>
 
-      <MapaReciente
+      <MapaCard
         titulo="Listas enlazadas"
         conceptos="7 conceptos"
-        theme={theme}
       />
 
-      <MapaReciente
+      <MapaCard
         titulo="Árboles binarios"
         conceptos="6 conceptos"
-        theme={theme}
       />
 
-      <MapaReciente
+      <MapaCard
         titulo="Algoritmos"
         conceptos="9 conceptos"
-        theme={theme}
       />
 
-      {/* PROGRESO */}
       <Text
         style={[
           styles.seccion,
-          styles.seccionProgreso,
+          styles.progresoTitulo,
           {
             color: theme.text,
           },
@@ -314,130 +255,8 @@ export default function InicioScreen({
         Tu progreso general
       </Text>
 
-      <View
-        style={[
-          styles.progresoCard,
-          {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.circulo,
-            {
-              borderColor: theme.primary,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.porcentaje,
-              {
-                color: theme.text,
-              },
-            ]}
-          >
-            65%
-          </Text>
-        </View>
-
-        <View style={styles.infoProgreso}>
-          <Text
-            style={[
-              styles.tituloProgreso,
-              {
-                color: theme.text,
-              },
-            ]}
-          >
-            Dominio promedio
-          </Text>
-
-          <Text
-            style={[
-              styles.descripcionProgreso,
-              {
-                color:
-                  theme.secondaryText,
-              },
-            ]}
-          >
-            Sigue estudiando para fortalecer tus conceptos.
-          </Text>
-        </View>
-      </View>
+      <ProgressCard porcentaje={65} />
     </ScrollView>
-  );
-}
-
-function MapaReciente({
-  titulo,
-  conceptos,
-  theme,
-}) {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.mapaCard,
-        {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        },
-      ]}
-      activeOpacity={0.8}
-    >
-      <View
-        style={[
-          styles.iconoMapa,
-          {
-            backgroundColor:
-              theme.primarySoft,
-
-            borderColor:
-              theme.primary,
-          },
-        ]}
-      >
-        <Ionicons
-          name="git-network-outline"
-          size={21}
-          color={theme.primary}
-        />
-      </View>
-
-      <View style={styles.infoMapa}>
-        <Text
-          style={[
-            styles.tituloMapa,
-            {
-              color: theme.text,
-            },
-          ]}
-        >
-          {titulo}
-        </Text>
-
-        <Text
-          style={[
-            styles.conceptosMapa,
-            {
-              color:
-                theme.secondaryText,
-            },
-          ]}
-        >
-          {conceptos}
-        </Text>
-      </View>
-
-      <Ionicons
-        name="chevron-forward"
-        size={20}
-        color={theme.primary}
-      />
-    </TouchableOpacity>
   );
 }
 
@@ -450,64 +269,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 55,
     paddingBottom: 40,
-  },
-
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-
-  logoIcono: {
-    width: 38,
-    height: 38,
-
-    borderRadius: 10,
-
-    justifyContent: 'center',
-    alignItems: 'center',
-
-    marginRight: 9,
-  },
-
-  logo: {
-    fontSize: 21,
-    fontWeight: 'bold',
-  },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-
-    marginBottom: 25,
-  },
-
-  saludoContainer: {
-    flex: 1,
-  },
-
-  saludo: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-
-  pregunta: {
-    fontSize: 14,
-  },
-
-  notificacion: {
-    width: 43,
-    height: 43,
-
-    borderRadius: 12,
-    borderWidth: 1,
-
-    justifyContent: 'center',
-    alignItems: 'center',
-
-    marginLeft: 10,
   },
 
   generador: {
@@ -529,14 +290,11 @@ const styles = StyleSheet.create({
 
   botonGenerar: {
     height: 52,
+
     borderRadius: 13,
 
     justifyContent: 'center',
     alignItems: 'center',
-  },
-
-  botonDeshabilitado: {
-    opacity: 0.6,
   },
 
   filaBoton: {
@@ -564,96 +322,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  verTodos: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  mapaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-
-    padding: 14,
-
-    borderRadius: 13,
-    borderWidth: 1,
-
-    marginBottom: 10,
-  },
-
-  iconoMapa: {
-    width: 43,
-    height: 43,
-
-    borderRadius: 10,
-    borderWidth: 1,
-
-    justifyContent: 'center',
-    alignItems: 'center',
-
-    marginRight: 12,
-  },
-
-  infoMapa: {
-    flex: 1,
-  },
-
-  tituloMapa: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-
-  conceptosMapa: {
-    fontSize: 12,
-  },
-
-  seccionProgreso: {
+  progresoTitulo: {
     marginTop: 22,
     marginBottom: 12,
-  },
-
-  progresoCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-
-    padding: 18,
-
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  circulo: {
-    width: 65,
-    height: 65,
-
-    borderRadius: 33,
-
-    borderWidth: 6,
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    marginRight: 16,
-  },
-
-  porcentaje: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
-  infoProgreso: {
-    flex: 1,
-  },
-
-  tituloProgreso: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-
-  descripcionProgreso: {
-    fontSize: 12,
-    lineHeight: 18,
   },
 });
