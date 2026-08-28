@@ -31,6 +31,7 @@ export default function InicioScreen({
   navigation,
 }) {
   const [tema, setTema] = useState('');
+  const [contenidoFuente, setContenidoFuente] = useState('');
   const [cargando, setCargando] = useState(false);
 
   const {
@@ -58,6 +59,7 @@ export default function InicioScreen({
         {
           body: {
             tema: tema.trim(),
+            contenido_fuente: contenidoFuente.trim(),
           },
         }
       );
@@ -94,6 +96,7 @@ export default function InicioScreen({
         .insert({
           tema: tema.trim(),
           contenido: data,
+          contenido_fuente: contenidoFuente.trim(),
           user_id: user.id,
         })
         .select()
@@ -122,6 +125,7 @@ export default function InicioScreen({
       );
 
       setTema('');
+      setContenidoFuente('');
     } catch (error) {
       console.log(
         'Error:',
@@ -168,6 +172,25 @@ export default function InicioScreen({
           onChangeText={setTema}
           editable={!cargando}
         />
+
+        <TextInput
+  style={[
+    styles.input,
+    styles.inputGrande,
+    {
+      backgroundColor: theme.input,
+      borderColor: theme.border,
+      color: theme.text,
+    },
+  ]}
+  placeholder="Escribe aquí tus apuntes o información sobre el tema..."
+  placeholderTextColor={theme.secondaryText}
+  value={contenidoFuente}
+  onChangeText={setContenidoFuente}
+  multiline
+  textAlignVertical="top"
+  editable={!cargando}
+/>
 
         <TouchableOpacity
           style={[
@@ -287,6 +310,12 @@ const styles = StyleSheet.create({
 
     marginBottom: 12,
   },
+
+  inputGrande: {
+  height: 130,
+  paddingTop: 14,
+  marginBottom: 12,
+},
 
   botonGenerar: {
     height: 52,

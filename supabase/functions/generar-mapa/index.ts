@@ -51,6 +51,7 @@ Deno.serve(async (req: Request) => {
     // Obtener el tema enviado por la aplicación
     const body = await req.json();
     const tema = body.tema;
+    const contenidoFuente = body.contenido_fuente;
 
     if (!tema || typeof tema !== "string") {
       return Response.json(
@@ -61,27 +62,46 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (!contenidoFuente || typeof contenidoFuente !== "string") {
+      return Response.json(
+        {
+          error: "Debes enviar información válida sobre el tema."
+        },
+        { status: 400 }
+      );
+    }
+
     // Prompt para Gemini
     const prompt = `
-Eres un asistente educativo especializado en organizar temas de estudio.
+Eres un asistente educativo especializado en organizar información de estudio.
 
-El estudiante quiere estudiar el siguiente tema:
+El estudiante está estudiando el siguiente tema:
 
 "${tema}"
 
-Analiza el tema y crea un mapa de conocimiento.
+Esta es la información proporcionada directamente por el estudiante:
 
-Debes identificar entre 5 y 10 conceptos importantes relacionados con el tema.
+"""
+${contenidoFuente}
+"""
 
-Para cada concepto indica qué otros conceptos deberían conocerse antes de estudiarlo.
+Tu tarea es convertir ÚNICAMENTE la información proporcionada por el estudiante
+en un mapa de conocimiento.
 
-Reglas:
-- El concepto principal debe aparecer.
-- Los prerrequisitos deben ser conceptos que realmente ayuden a comprender el concepto.
-- No repitas conceptos.
+REGLAS IMPORTANTES:
+
+- Usa únicamente conceptos que aparezcan o puedan identificarse directamente
+  en la información proporcionada.
+- NO agregues información externa.
+- NO inventes conceptos que no estén presentes en los apuntes.
+- Identifica entre 5 y 10 conceptos cuando la información lo permita.
+- El concepto principal debe estar relacionado con el tema.
+- Para cada concepto indica qué otros conceptos de los mismos apuntes
+  deberían conocerse antes.
 - Si un concepto no necesita prerrequisitos, devuelve una lista vacía.
+- No repitas conceptos.
 - Mantén los nombres de los conceptos cortos y claros.
-- No agregues explicaciones fuera del JSON.
+- Devuelve únicamente el JSON solicitado.
 `;
 
     // Llamar a Gemini
