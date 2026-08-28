@@ -7,20 +7,15 @@ import {
   StyleSheet,
 } from 'react-native';
 
-import Ionicons from '@expo/vector-icons/Ionicons';
-
-import {
-  useTheme,
-} from '../context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 
 export default function MapaCard({
   titulo,
   conceptos,
   onPress,
 }) {
-  const {
-    theme,
-  } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <TouchableOpacity
@@ -38,11 +33,8 @@ export default function MapaCard({
         style={[
           styles.icono,
           {
-            backgroundColor:
-              theme.primarySoft,
-
-            borderColor:
-              theme.primary,
+            backgroundColor: theme.primarySoft,
+            borderColor: theme.primary,
           },
         ]}
       >
@@ -91,25 +83,19 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-
     padding: 14,
-
     borderRadius: 13,
     borderWidth: 1,
-
     marginBottom: 10,
   },
 
   icono: {
     width: 43,
     height: 43,
-
     borderRadius: 10,
     borderWidth: 1,
-
     justifyContent: 'center',
     alignItems: 'center',
-
     marginRight: 12,
   },
 

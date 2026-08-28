@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
 import { supabase } from '../services/supabase';
 

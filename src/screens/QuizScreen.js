@@ -1,89 +1,284 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
 
-// Preguntas fijas de ejemplo, mientras la IA genera preguntas reales por concepto
-const preguntasEjemplo = [
-  {
-    pregunta: '¿Qué es una función?',
-    opciones: ['Una relación entre entrada y salida', 'Un número', 'Una lista'],
-    correcta: 0, // índice de la opción correcta dentro del array 'opciones'
-  },
-  {
-    pregunta: '¿Un límite describe...?',
-    opciones: ['El valor final de una lista', 'A qué valor se acerca una función', 'Una derivada'],
-    correcta: 1,
-  },
-];
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+
+import { supabase } from '../services/supabase';
+import { useTheme } from '../context/ThemeContext';
 
 export default function QuizScreen({ route, navigation }) {
-  // 'concepto' es un objeto de la clase Concepto (de MapaConocimiento.js),
-  // no solo texto — por eso podemos llamar sus métodos como marcarRespuesta()
-  const { concepto } = route.params;
+  const { theme } = useTheme();
 
-  // Índice de qué pregunta se está mostrando ahora mismo
-  const [preguntaActual, setPreguntaActual] = useState(0);
+  const {
+    concepto,
+    contenidoFuente,
+    mapaId,
+    tema,
+    mapa,
+  } = route.params;
 
-  // Contador de cuántas respondió bien, para mostrar el resultado al final
-  const [respuestasCorrectas, setRespuestasCorrectas] = useState(0);
-
-  // true cuando ya respondió todas las preguntas
+  const [preguntas, setPreguntas] = useState([]);
+  const [actual, setActual] = useState(0);
+  const [correctas, setCorrectas] = useState(0);
+  const [cargando, setCargando] = useState(true);
   const [terminado, setTerminado] = useState(false);
 
-  const pregunta = preguntasEjemplo[preguntaActual];
+  useEffect(() => {
+    generarQuiz();
+  }, []);
 
-  // Se ejecuta al tocar una opción de respuesta
-  const handleResponder = (indiceElegido) => {
-    const esCorrecta = indiceElegido === pregunta.correcta;
+  // Genera las preguntas
+  const generarQuiz = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'generar-quiz',
+        {
+          body: {
+            concepto: concepto.nombre,
+            contenido_fuente: contenidoFuente,
+          },
+        }
+      );
 
-    // Actualiza el nivelDominio del concepto usando el método
-    // que ya está definido en la clase Concepto (src/modelos/Concepto.js)
-    concepto.marcarRespuesta(esCorrecta);
+      if (error || !data?.preguntas) {
+        Alert.alert('Error', 'No se pudo generar el quiz.');
+        return;
+      }
 
-    if (esCorrecta) {
-      setRespuestasCorrectas(respuestasCorrectas + 1);
+      setPreguntas(data.preguntas);
+
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  // Revisa respuesta
+  const responder = (opcion) => {
+    let total = correctas;
+
+    if (opcion === preguntas[actual].correcta) {
+      total++;
+      setCorrectas(total);
     }
 
-    // Avanza a la siguiente pregunta, o termina el quiz si ya no hay más
-    const siguienteIndice = preguntaActual + 1;
-    if (siguienteIndice < preguntasEjemplo.length) {
-      setPreguntaActual(siguienteIndice);
+    if (actual < preguntas.length - 1) {
+      setActual(actual + 1);
     } else {
       setTerminado(true);
     }
   };
 
-  // Pantalla de resultado final, se muestra en vez del quiz cuando terminado === true
-  if (terminado) {
+  // Calcula resultado
+  const obtenerResultado = () => {
+    const porcentaje = Math.round(
+      (correctas / preguntas.length) * 100
+    );
+
+    let estado = 'repasar';
+    let prioridad = 1;
+
+    if (porcentaje >= 80) {
+      estado = 'dominado';
+      prioridad = 3;
+    } else if (porcentaje >= 50) {
+      estado = 'aprendiendo';
+      prioridad = 2;
+    }
+
+    return {
+      porcentaje,
+      estado,
+      prioridad,
+    };
+  };
+
+  // Guarda y vuelve al mapa
+  const volverAlMapa = async () => {
+    const resultado = obtenerResultado();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      Alert.alert('Error', 'No se encontró el usuario.');
+      return;
+    }
+
+    // Borra resultado anterior
+    await supabase
+      .from('resultados_quiz')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('mapa_id', mapaId)
+      .eq('concepto', concepto.nombre);
+
+    // Guarda resultado nuevo
+    const { error } = await supabase
+      .from('resultados_quiz')
+      .insert({
+        user_id: user.id,
+        mapa_id: mapaId,
+        concepto: concepto.nombre,
+        porcentaje: resultado.porcentaje,
+        estado: resultado.estado,
+        prioridad: resultado.prioridad,
+      });
+
+    if (error) {
+      console.log('Error guardando:', error);
+      Alert.alert('Error', 'No se pudo guardar.');
+      return;
+    }
+
+    navigation.popTo('VerMapa', {
+      mapaId,
+      tema,
+      mapa,
+      contenidoFuente,
+    });
+  };
+
+  if (cargando) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.titulo}>¡Terminaste!</Text>
-        <Text style={styles.resultado}>
-          Respondiste bien {respuestasCorrectas} de {preguntasEjemplo.length}
+      <View
+        style={[
+          styles.centro,
+          { backgroundColor: theme.background },
+        ]}
+      >
+        <ActivityIndicator
+          size="large"
+          color={theme.primary}
+        />
+
+        <Text style={{ color: theme.text }}>
+          Generando preguntas...
         </Text>
-        <Text style={styles.dominio}>
-          Nivel de dominio de "{concepto.nombre}": {concepto.nivelDominio}%
+      </View>
+    );
+  }
+
+  if (terminado) {
+    const resultado = obtenerResultado();
+
+    return (
+      <View
+        style={[
+          styles.centro,
+          { backgroundColor: theme.background },
+        ]}
+      >
+        <Text
+          style={[
+            styles.titulo,
+            { color: theme.text },
+          ]}
+        >
+          Quiz terminado
         </Text>
-        <TouchableOpacity style={styles.boton} onPress={() => navigation.goBack()}>
-          <Text style={styles.botonTexto}>Volver al mapa</Text>
+
+        <Text
+          style={[
+            styles.porcentaje,
+            { color: theme.primary },
+          ]}
+        >
+          {resultado.porcentaje}%
+        </Text>
+
+        <Text style={{ color: theme.text }}>
+          {correctas} de {preguntas.length} correctas
+        </Text>
+
+        <Text
+          style={{
+            color: theme.secondaryText,
+            marginTop: 10,
+          }}
+        >
+          Estado: {resultado.estado}
+        </Text>
+
+        <TouchableOpacity
+          style={[
+            styles.boton,
+            { backgroundColor: theme.primary },
+          ]}
+          onPress={volverAlMapa}
+        >
+          <Text style={styles.textoBoton}>
+            Volver al mapa
+          </Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // Pantalla normal del quiz, mientras terminado === false
-  return (
-    <View style={styles.container}>
-      <Text style={styles.concepto}>{concepto.nombre}</Text>
-      <Text style={styles.pregunta}>{pregunta.pregunta}</Text>
+  const pregunta = preguntas[actual];
 
-      {/* Recorre las opciones de la pregunta actual y crea un botón por cada una */}
+  return (
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.background },
+      ]}
+    >
+      <Text style={{ color: theme.secondaryText }}>
+        Pregunta {actual + 1} de {preguntas.length}
+      </Text>
+
+      <Text
+        style={[
+          styles.titulo,
+          { color: theme.text },
+        ]}
+      >
+        {concepto.nombre}
+      </Text>
+
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.pregunta,
+            { color: theme.text },
+          ]}
+        >
+          {pregunta.pregunta}
+        </Text>
+      </View>
+
       {pregunta.opciones.map((opcion, index) => (
         <TouchableOpacity
           key={index}
-          style={styles.opcion}
-          onPress={() => handleResponder(index)}
+          style={[
+            styles.opcion,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+            },
+          ]}
+          onPress={() => responder(index)}
         >
-          <Text style={styles.opcionTexto}>{opcion}</Text>
+          <Text style={{ color: theme.text }}>
+            {String.fromCharCode(65 + index)}. {opcion}
+          </Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -93,57 +288,55 @@ export default function QuizScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 22,
+    paddingTop: 70,
+  },
+
+  centro: {
+    flex: 1,
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
+    padding: 25,
   },
-  concepto: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  pregunta: {
-    fontSize: 20,
+
+  titulo: {
+    fontSize: 25,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginVertical: 20,
   },
+
+  card: {
+    borderWidth: 1,
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 20,
+  },
+
+  pregunta: {
+    fontSize: 18,
+    lineHeight: 26,
+  },
+
   opcion: {
     borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
+    borderRadius: 13,
+    padding: 16,
+    marginBottom: 12,
   },
-  opcionTexto: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  titulo: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  resultado: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  dominio: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
+
+  porcentaje: {
+    fontSize: 55,
     fontWeight: 'bold',
   },
+
   boton: {
-    backgroundColor: '#333',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
+    marginTop: 25,
   },
-  botonTexto: {
-    color: '#fff',
-    textAlign: 'center',
+
+  textoBoton: {
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
 });

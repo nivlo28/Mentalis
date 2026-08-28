@@ -1,6 +1,4 @@
-import React, {
-  useState,
-} from 'react';
+import React, { useCallback, useState } from 'react';
 
 import {
   View,
@@ -14,47 +12,94 @@ import {
 } from 'react-native';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 
-import {
-  supabase,
-} from '../services/supabase';
-
-import {
-  useTheme,
-} from '../context/ThemeContext';
+import { supabase } from '../services/supabase';
+import { useTheme } from '../context/ThemeContext';
 
 import HeaderMentalis from '../components/HeaderMentalis';
 import MapaCard from '../components/MapaCard';
 import ProgressCard from '../components/ProgressCard';
 
-export default function InicioScreen({
-  navigation,
-}) {
+export default function InicioScreen({ navigation }) {
+  const { theme } = useTheme();
+
   const [tema, setTema] = useState('');
   const [contenidoFuente, setContenidoFuente] = useState('');
   const [cargando, setCargando] = useState(false);
 
-  const {
-    theme,
-  } = useTheme();
+  const [mapas, setMapas] = useState([]);
+  const [progreso, setProgreso] = useState(0);
 
+  // Carga mapas y progreso
+  const cargarDatos = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    // Busca los mapas
+    const { data: mapasData } = await supabase
+      .from('mapas')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    const listaMapas = mapasData || [];
+
+    // Muestra solo los últimos 3
+    setMapas(listaMapas.slice(0, 3));
+
+    // Busca resultados de quiz
+    const { data: resultados } = await supabase
+      .from('resultados_quiz')
+      .select('mapa_id, concepto')
+      .eq('user_id', user.id);
+
+    // Cuenta todos los conceptos
+    let totalConceptos = 0;
+
+    listaMapas.forEach((mapa) => {
+      totalConceptos += mapa.contenido?.conceptos?.length || 0;
+    });
+
+    // No cuenta dos veces el mismo concepto
+    const evaluados = new Set(
+      (resultados || []).map(
+        (item) => `${item.mapa_id}-${item.concepto}`
+      )
+    );
+
+    // Calcula el progreso
+    const porcentaje =
+      totalConceptos > 0
+        ? Math.round((evaluados.size / totalConceptos) * 100)
+        : 0;
+
+    setProgreso(porcentaje);
+  };
+
+  // Actualiza cuando entra a Inicio
+  useFocusEffect(
+    useCallback(() => {
+      cargarDatos();
+    }, [])
+  );
+
+  // Genera un mapa
   const handleCrearMapa = async () => {
-    if (!tema.trim()) {
+    if (!tema.trim() || !contenidoFuente.trim()) {
       Alert.alert(
-        'Tema requerido',
-        'Escribe un tema primero'
+        'Faltan datos',
+        'Escribe el tema y tus apuntes.'
       );
-
       return;
     }
 
     try {
       setCargando(true);
 
-      const {
-        data,
-        error,
-      } = await supabase.functions.invoke(
+      // Gemini genera el mapa
+      const { data, error } = await supabase.functions.invoke(
         'generar-mapa',
         {
           body: {
@@ -65,95 +110,73 @@ export default function InicioScreen({
       );
 
       if (error) {
-        Alert.alert(
-          'Error',
-          'No se pudo generar el mapa.'
-        );
-
+        Alert.alert('Error', 'No se pudo generar el mapa.');
         return;
       }
 
-      const {
-        data: {
-          user,
-        },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
 
-      if (!user) {
-        Alert.alert(
-          'Error',
-          'No se pudo identificar tu usuario.'
-        );
+      if (!user) return;
 
-        return;
-      }
-
-      const {
-        data: mapaGuardado,
-        error: errorGuardar,
-      } = await supabase
-        .from('mapas')
-        .insert({
-          tema: tema.trim(),
-          contenido: data,
-          contenido_fuente: contenidoFuente.trim(),
-          user_id: user.id,
-        })
-        .select()
-        .single();
+      // Guarda el mapa
+      const { data: mapaGuardado, error: errorGuardar } =
+        await supabase
+          .from('mapas')
+          .insert({
+            tema: tema.trim(),
+            contenido: data,
+            contenido_fuente: contenidoFuente.trim(),
+            user_id: user.id,
+          })
+          .select()
+          .single();
 
       if (errorGuardar) {
-        console.log(
-          'Error guardando mapa:',
-          errorGuardar
-        );
-
-        Alert.alert(
-          'Error',
-          'El mapa se generó pero no se pudo guardar.'
-        );
-
+        Alert.alert('Error', 'No se pudo guardar el mapa.');
         return;
       }
-
-      navigation.navigate(
-        'VerMapa',
-        {
-          tema: mapaGuardado.tema,
-          mapa: mapaGuardado.contenido,
-        }
-      );
 
       setTema('');
       setContenidoFuente('');
-    } catch (error) {
-      console.log(
-        'Error:',
-        error
-      );
 
-      Alert.alert(
-        'Error',
-        'Ocurrió un problema inesperado.'
-      );
+      // Abre el mapa
+      navigation.navigate('VerMapa', {
+        mapaId: mapaGuardado.id,
+        tema: mapaGuardado.tema,
+        mapa: mapaGuardado.contenido,
+        contenidoFuente: mapaGuardado.contenido_fuente,
+      });
+
+    } catch (error) {
+      console.log(error);
+      Alert.alert('Error', 'Ocurrió un problema.');
     } finally {
       setCargando(false);
     }
+  };
+
+  // Abre un mapa reciente
+  const abrirMapa = (mapa) => {
+    navigation.navigate('VerMapa', {
+      mapaId: mapa.id,
+      tema: mapa.tema,
+      mapa: mapa.contenido,
+      contenidoFuente: mapa.contenido_fuente,
+    });
   };
 
   return (
     <ScrollView
       style={[
         styles.container,
-        {
-          backgroundColor: theme.background,
-        },
+        { backgroundColor: theme.background },
       ]}
       contentContainerStyle={styles.contenido}
       showsVerticalScrollIndicator={false}
     >
       <HeaderMentalis />
 
+      {/* Generador */}
       <View style={styles.generador}>
         <TextInput
           style={[
@@ -165,54 +188,45 @@ export default function InicioScreen({
             },
           ]}
           placeholder="Ej: Listas enlazadas..."
-          placeholderTextColor={
-            theme.secondaryText
-          }
+          placeholderTextColor={theme.secondaryText}
           value={tema}
           onChangeText={setTema}
-          editable={!cargando}
         />
 
         <TextInput
-  style={[
-    styles.input,
-    styles.inputGrande,
-    {
-      backgroundColor: theme.input,
-      borderColor: theme.border,
-      color: theme.text,
-    },
-  ]}
-  placeholder="Escribe aquí tus apuntes o información sobre el tema..."
-  placeholderTextColor={theme.secondaryText}
-  value={contenidoFuente}
-  onChangeText={setContenidoFuente}
-  multiline
-  textAlignVertical="top"
-  editable={!cargando}
-/>
+          style={[
+            styles.input,
+            styles.inputGrande,
+            {
+              backgroundColor: theme.input,
+              borderColor: theme.border,
+              color: theme.text,
+            },
+          ]}
+          placeholder="Escribe aquí tus apuntes..."
+          placeholderTextColor={theme.secondaryText}
+          value={contenidoFuente}
+          onChangeText={setContenidoFuente}
+          multiline
+          textAlignVertical="top"
+        />
 
         <TouchableOpacity
           style={[
-            styles.botonGenerar,
-            {
-              backgroundColor:
-                theme.primary,
-            },
+            styles.boton,
+            { backgroundColor: theme.primary },
           ]}
           onPress={handleCrearMapa}
           disabled={cargando}
         >
           {cargando ? (
-            <ActivityIndicator
-              color="#FFFFFF"
-            />
+            <ActivityIndicator color="#fff" />
           ) : (
             <View style={styles.filaBoton}>
               <Ionicons
                 name="sparkles"
                 size={18}
-                color="#FFFFFF"
+                color="#fff"
               />
 
               <Text style={styles.textoBoton}>
@@ -223,22 +237,19 @@ export default function InicioScreen({
         </TouchableOpacity>
       </View>
 
+      {/* Mapas recientes */}
       <View style={styles.tituloSeccion}>
         <Text
           style={[
             styles.seccion,
-            {
-              color: theme.text,
-            },
+            { color: theme.text },
           ]}
         >
           Tus mapas recientes
         </Text>
 
         <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('Mapas')
-          }
+          onPress={() => navigation.navigate('Mapas')}
         >
           <Text
             style={{
@@ -251,34 +262,36 @@ export default function InicioScreen({
         </TouchableOpacity>
       </View>
 
-      <MapaCard
-        titulo="Listas enlazadas"
-        conceptos="7 conceptos"
-      />
+      {mapas.length === 0 ? (
+        <Text style={{ color: theme.secondaryText }}>
+          Todavía no tienes mapas.
+        </Text>
+      ) : (
+        mapas.map((mapa) => (
+          <MapaCard
+            key={mapa.id}
+            titulo={mapa.tema}
+            conceptos={
+              `${mapa.contenido?.conceptos?.length || 0} conceptos`
+            }
+            onPress={() => abrirMapa(mapa)}
+          />
+        ))
+      )}
 
-      <MapaCard
-        titulo="Árboles binarios"
-        conceptos="6 conceptos"
-      />
-
-      <MapaCard
-        titulo="Algoritmos"
-        conceptos="9 conceptos"
-      />
-
+      {/* Progreso */}
       <Text
         style={[
           styles.seccion,
           styles.progresoTitulo,
-          {
-            color: theme.text,
-          },
+          { color: theme.text },
         ]}
       >
         Tu progreso general
       </Text>
 
-      <ProgressCard porcentaje={65} />
+      <ProgressCard porcentaje={progreso} />
+
     </ScrollView>
   );
 }
@@ -300,28 +313,21 @@ const styles = StyleSheet.create({
 
   input: {
     height: 54,
-
     borderRadius: 13,
     borderWidth: 1,
-
     paddingHorizontal: 16,
-
     fontSize: 15,
-
     marginBottom: 12,
   },
 
   inputGrande: {
-  height: 130,
-  paddingTop: 14,
-  marginBottom: 12,
-},
+    height: 130,
+    paddingTop: 14,
+  },
 
-  botonGenerar: {
+  boton: {
     height: 52,
-
     borderRadius: 13,
-
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -333,7 +339,7 @@ const styles = StyleSheet.create({
   },
 
   textoBoton: {
-    color: '#FFFFFF',
+    color: '#fff',
     fontSize: 15,
     fontWeight: 'bold',
   },
@@ -342,7 +348,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-
     marginBottom: 12,
   },
 
