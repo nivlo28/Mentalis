@@ -14,7 +14,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 
 import ListaEnlazada from '../estructuras/ListaEnlazada';
-import { obtenerOrdenRepaso } from '../services/repasoService';
+import ColaPrioridad from '../estructuras/ColaPrioridad';
 
 import ConceptoCard from '../components/ConceptoCard';
 
@@ -76,23 +76,34 @@ export default function VerMapaScreen({
     return lista.recorrer();
   }, [mapa]);
 
-  // Agrega resultados a los conceptos
-  const conceptosConEstado = useMemo(() => {
-    return conceptos.map((concepto) => {
-      const resultado = resultados[concepto.nombre];
-
-      return {
-        ...concepto,
-        estado: resultado?.estado || 'sin evaluar',
-        porcentaje: resultado?.porcentaje,
-      };
-    });
-  }, [conceptos, resultados]);
-
-  // Ordena usando ColaPrioridad
+  // Crea la cola de prioridad
   const ordenRepaso = useMemo(() => {
-    return obtenerOrdenRepaso(conceptosConEstado);
-  }, [conceptosConEstado]);
+    const cola = new ColaPrioridad();
+
+    conceptos.forEach((concepto) => {
+      const resultado =
+        resultados[concepto.nombre];
+
+      let estado = 'sin evaluar';
+      let prioridad = 2;
+
+      if (resultado) {
+        estado = resultado.estado;
+        prioridad = resultado.prioridad;
+      }
+
+      cola.encolar(
+        {
+          ...concepto,
+          estado,
+          porcentaje: resultado?.porcentaje,
+        },
+        prioridad
+      );
+    });
+
+    return cola.recorrer();
+  }, [conceptos, resultados]);
 
   // Abre el quiz
   const abrirQuiz = (concepto) => {
@@ -142,7 +153,9 @@ export default function VerMapaScreen({
         </Text>
 
         <Text
-          style={{ color: theme.secondaryText }}
+          style={{
+            color: theme.secondaryText,
+          }}
         >
           {conceptos.length} conceptos
         </Text>
@@ -224,7 +237,9 @@ export default function VerMapaScreen({
               <Text
                 style={[
                   styles.estado,
-                  { color: theme.secondaryText },
+                  {
+                    color: theme.secondaryText,
+                  },
                 ]}
               >
                 {item.valor.estado}
