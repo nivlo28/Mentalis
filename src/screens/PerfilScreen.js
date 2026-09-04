@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 import {
   View,
@@ -10,24 +10,43 @@ import {
   Alert,
 } from 'react-native';
 
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
-import {
-  useTheme,
-} from '../context/ThemeContext';
-
-import {
-  supabase,
-} from '../services/supabase';
+import { useTheme } from '../context/ThemeContext';
+import { supabase } from '../services/supabase';
 
 export default function PerfilScreen() {
-  const {
-    theme,
-    modoOscuro,
-    cambiarTema,
-  } = useTheme();
+  const { theme, modoOscuro, cambiarTema } = useTheme();
 
-  async function cerrarSesion() {
+  // Datos del usuario
+  const [email, setEmail] = useState('');
+  const [plan, setPlan] = useState('free');
+
+  // Carga correo y plan
+  useEffect(() => {
+    cargarPerfil();
+  }, []);
+
+  const cargarPerfil = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    setEmail(user.email || '');
+
+    const { data } = await supabase
+      .from('perfiles')
+      .select('plan')
+      .eq('user_id', user.id)
+      .single();
+
+    setPlan(data?.plan || 'free');
+  };
+
+  // Cierra sesión
+  const cerrarSesion = () => {
     Alert.alert(
       'Cerrar sesión',
       '¿Seguro que quieres cerrar sesión?',
@@ -36,65 +55,43 @@ export default function PerfilScreen() {
           text: 'Cancelar',
           style: 'cancel',
         },
-
         {
           text: 'Cerrar sesión',
           style: 'destructive',
-
           onPress: async () => {
-            const {
-              error,
-            } = await supabase.auth.signOut();
-
-            if (error) {
-              Alert.alert(
-                'Error',
-                'No se pudo cerrar sesión.'
-              );
-            }
+            await supabase.auth.signOut();
           },
         },
       ]
     );
-  }
+  };
 
   return (
     <ScrollView
       style={[
         styles.container,
-        {
-          backgroundColor: theme.background,
-        },
+        { backgroundColor: theme.background },
       ]}
       contentContainerStyle={styles.contenido}
-      showsVerticalScrollIndicator={false}
     >
-      <Text
-        style={[
-          styles.titulo,
-          {
-            color: theme.text,
-          },
-        ]}
-      >
+      <Text style={[styles.titulo, { color: theme.text }]}>
         Perfil
       </Text>
 
       <Text
         style={[
           styles.subtitulo,
-          {
-            color: theme.secondaryText,
-          },
+          { color: theme.secondaryText },
         ]}
       >
         Configura tu experiencia en Mentalis
       </Text>
 
-      {/* PERFIL */}
+      {/* Usuario */}
       <View
         style={[
-          styles.perfilCard,
+          styles.card,
+          styles.perfil,
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
@@ -104,14 +101,12 @@ export default function PerfilScreen() {
         <View
           style={[
             styles.avatar,
-            {
-              backgroundColor: theme.primarySoft,
-            },
+            { backgroundColor: theme.primarySoft },
           ]}
         >
           <Ionicons
             name="person"
-            size={35}
+            size={30}
             color={theme.primary}
           />
         </View>
@@ -120,34 +115,79 @@ export default function PerfilScreen() {
           <Text
             style={[
               styles.nombre,
-              {
-                color: theme.text,
-              },
+              { color: theme.text },
             ]}
           >
             Usuario Mentalis
           </Text>
 
           <Text
-            style={[
-              styles.email,
-              {
-                color: theme.secondaryText,
-              },
-            ]}
+            style={{
+              color: theme.secondaryText,
+              fontSize: 12,
+            }}
           >
-            Estudiante
+            {email}
           </Text>
         </View>
       </View>
 
-      {/* APARIENCIA */}
+      {/* Plan */}
       <Text
         style={[
-          styles.tituloSeccion,
+          styles.seccion,
+          { color: theme.text },
+        ]}
+      >
+        Tu plan
+      </Text>
+
+      <View
+        style={[
+          styles.card,
+          styles.fila,
           {
-            color: theme.text,
+            backgroundColor: theme.card,
+            borderColor: theme.border,
           },
+        ]}
+      >
+        <Ionicons
+          name={plan === 'plus' ? 'star' : 'person-outline'}
+          size={24}
+          color={theme.primary}
+        />
+
+        <View style={styles.texto}>
+          <Text
+            style={[
+              styles.nombre,
+              { color: theme.text },
+            ]}
+          >
+            {plan === 'plus'
+              ? 'Mentalis Plus'
+              : 'Mentalis Free'}
+          </Text>
+
+          <Text
+            style={{
+              color: theme.secondaryText,
+              fontSize: 12,
+            }}
+          >
+            {plan === 'plus'
+              ? 'Suscripción activa'
+              : 'Plan gratuito'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Apariencia */}
+      <Text
+        style={[
+          styles.seccion,
+          { color: theme.text },
         ]}
       >
         Apariencia
@@ -156,235 +196,69 @@ export default function PerfilScreen() {
       <View
         style={[
           styles.card,
+          styles.fila,
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
           },
         ]}
       >
-        <View style={styles.opcion}>
-          <View
+        <Ionicons
+          name={modoOscuro ? 'moon' : 'sunny'}
+          size={24}
+          color={theme.primary}
+        />
+
+        <View style={styles.texto}>
+          <Text
             style={[
-              styles.iconoContenedor,
-              {
-                backgroundColor: theme.primarySoft,
-              },
+              styles.nombre,
+              { color: theme.text },
             ]}
           >
-            <Ionicons
-              name={
-                modoOscuro
-                  ? 'moon'
-                  : 'sunny'
-              }
-              size={22}
-              color={theme.primary}
-            />
-          </View>
+            {modoOscuro
+              ? 'Modo oscuro'
+              : 'Modo claro'}
+          </Text>
 
-          <View style={styles.textoOpcion}>
-            <Text
-              style={[
-                styles.nombreOpcion,
-                {
-                  color: theme.text,
-                },
-              ]}
-            >
-              {modoOscuro
-                ? 'Modo oscuro'
-                : 'Modo claro'}
-            </Text>
-
-            <Text
-              style={[
-                styles.descripcion,
-                {
-                  color: theme.secondaryText,
-                },
-              ]}
-            >
-              Cambia la apariencia de Mentalis
-            </Text>
-          </View>
-
-          <Switch
-            value={modoOscuro}
-            onValueChange={cambiarTema}
-            trackColor={{
-              false: '#D1D5DB',
-              true: theme.primary,
+          <Text
+            style={{
+              color: theme.secondaryText,
+              fontSize: 12,
             }}
-            thumbColor="#FFFFFF"
-          />
+          >
+            Cambia la apariencia
+          </Text>
         </View>
+
+        <Switch
+          value={modoOscuro}
+          onValueChange={cambiarTema}
+          trackColor={{
+            false: '#D1D5DB',
+            true: theme.primary,
+          }}
+        />
       </View>
 
-      {/* ESTADÍSTICAS */}
-      <Text
-        style={[
-          styles.tituloSeccion,
-          {
-            color: theme.text,
-          },
-        ]}
-      >
-        Tu actividad
-      </Text>
-
-      <View style={styles.estadisticas}>
-        <View
-          style={[
-            styles.estadistica,
-            {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name="map-outline"
-            size={25}
-            color={theme.primary}
-          />
-
-          <Text
-            style={[
-              styles.numero,
-              {
-                color: theme.text,
-              },
-            ]}
-          >
-            0
-          </Text>
-
-          <Text
-            style={[
-              styles.descripcionEstadistica,
-              {
-                color: theme.secondaryText,
-              },
-            ]}
-          >
-            Mapas
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.estadistica,
-            {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name="school-outline"
-            size={25}
-            color={theme.primary}
-          />
-
-          <Text
-            style={[
-              styles.numero,
-              {
-                color: theme.text,
-              },
-            ]}
-          >
-            0
-          </Text>
-
-          <Text
-            style={[
-              styles.descripcionEstadistica,
-              {
-                color: theme.secondaryText,
-              },
-            ]}
-          >
-            Repasos
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.estadistica,
-            {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name="flame-outline"
-            size={25}
-            color={theme.primary}
-          />
-
-          <Text
-            style={[
-              styles.numero,
-              {
-                color: theme.text,
-              },
-            ]}
-          >
-            0
-          </Text>
-
-          <Text
-            style={[
-              styles.descripcionEstadistica,
-              {
-                color: theme.secondaryText,
-              },
-            ]}
-          >
-            Racha
-          </Text>
-        </View>
-      </View>
-
-      {/* CUENTA */}
-      <Text
-        style={[
-          styles.tituloSeccion,
-          {
-            color: theme.text,
-          },
-        ]}
-      >
-        Cuenta
-      </Text>
-
+      {/* Cerrar sesión */}
       <TouchableOpacity
         style={[
-          styles.cerrarSesion,
+          styles.cerrar,
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
           },
         ]}
-        activeOpacity={0.8}
         onPress={cerrarSesion}
       >
         <Ionicons
           name="log-out-outline"
           size={22}
-          color={theme.danger}
+          color="#EF4444"
         />
 
-        <Text
-          style={[
-            styles.textoCerrar,
-            {
-              color: theme.danger,
-            },
-          ]}
-        >
+        <Text style={styles.textoCerrar}>
           Cerrar sesión
         </Text>
       </TouchableOpacity>
@@ -398,7 +272,7 @@ const styles = StyleSheet.create({
   },
 
   contenido: {
-    paddingHorizontal: 20,
+    padding: 20,
     paddingTop: 55,
     paddingBottom: 40,
   },
@@ -414,133 +288,61 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
 
-  perfilCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 17,
-
-    flexDirection: 'row',
-    alignItems: 'center',
-
-    marginBottom: 28,
-  },
-
-  avatar: {
-    width: 58,
-    height: 58,
-
-    borderRadius: 29,
-
-    justifyContent: 'center',
-    alignItems: 'center',
-
-    marginRight: 15,
-  },
-
-  nombre: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-
-  email: {
-    fontSize: 13,
-  },
-
-  tituloSeccion: {
+  seccion: {
     fontSize: 16,
     fontWeight: 'bold',
-
     marginBottom: 12,
-    marginTop: 5,
   },
 
   card: {
-    borderRadius: 14,
     borderWidth: 1,
+    borderRadius: 14,
     padding: 15,
-
-    marginBottom: 28,
+    marginBottom: 25,
   },
 
-  opcion: {
+  perfil: {
     flexDirection: 'row',
     alignItems: 'center',
   },
 
-  iconoContenedor: {
-    width: 45,
-    height: 45,
+  fila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
 
-    borderRadius: 11,
-
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-
     marginRight: 12,
   },
 
-  textoOpcion: {
+  texto: {
     flex: 1,
+    marginLeft: 12,
   },
 
-  nombreOpcion: {
+  nombre: {
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 3,
   },
 
-  descripcion: {
-    fontSize: 12,
-  },
-
-  estadisticas: {
-    flexDirection: 'row',
-    gap: 10,
-
-    marginBottom: 28,
-  },
-
-  estadistica: {
-    flex: 1,
-
-    minHeight: 110,
-
-    borderRadius: 14,
-    borderWidth: 1,
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    padding: 10,
-  },
-
-  numero: {
-    fontSize: 20,
-    fontWeight: 'bold',
-
-    marginTop: 7,
-    marginBottom: 2,
-  },
-
-  descripcionEstadistica: {
-    fontSize: 11,
-  },
-
-  cerrarSesion: {
+  cerrar: {
     height: 54,
-
     borderRadius: 14,
     borderWidth: 1,
-
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-
     gap: 8,
   },
 
   textoCerrar: {
+    color: '#EF4444',
     fontSize: 15,
     fontWeight: '600',
   },
