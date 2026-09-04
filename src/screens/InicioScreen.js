@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { supabase } from '../services/supabase';
+import { puedeCrearMapa } from '../services/planService';
 import { useTheme } from '../context/ThemeContext';
 
 import HeaderMentalis from '../components/HeaderMentalis';
@@ -45,6 +46,8 @@ export default function InicioScreen({ navigation }) {
       .order('created_at', { ascending: false });
 
     const listaMapas = mapasData || [];
+
+    // Muestra los últimos 3
     setMapas(listaMapas.slice(0, 3));
 
     const { data: resultados } = await supabase
@@ -52,34 +55,46 @@ export default function InicioScreen({ navigation }) {
       .select('mapa_id, concepto')
       .eq('user_id', user.id);
 
+    // Cuenta todos los conceptos
     const totalConceptos = listaMapas.reduce(
       (total, mapa) =>
         total + (mapa.contenido?.conceptos?.length || 0),
       0
     );
 
+    // Evita contar un concepto dos veces
     const evaluados = new Set(
       (resultados || []).map(
         (item) => `${item.mapa_id}-${item.concepto}`
       )
     );
 
-    setProgreso(
-      totalConceptos
-        ? Math.round((evaluados.size / totalConceptos) * 100)
-        : 0
-    );
+    // Calcula el progreso
+    const porcentaje = totalConceptos
+      ? Math.round((evaluados.size / totalConceptos) * 100)
+      : 0;
+
+    setProgreso(porcentaje);
   };
 
-  // Actualiza al volver a Inicio
   useFocusEffect(
     useCallback(() => {
       cargarDatos();
     }, [])
   );
 
+  // Abre un mapa
+  const abrirMapa = (mapa) => {
+    navigation.navigate('VerMapa', {
+      mapaId: mapa.id,
+      tema: mapa.tema,
+      mapa: mapa.contenido,
+      contenidoFuente: mapa.contenido_fuente,
+    });
+  };
+
   // Genera un mapa
-  const handleCrearMapa = async () => {
+  const crearMapa = async () => {
     if (!tema.trim() || !contenidoFuente.trim()) {
       Alert.alert(
         'Faltan datos',
@@ -88,9 +103,29 @@ export default function InicioScreen({ navigation }) {
       return;
     }
 
-    try {
-      setCargando(true);
+    setCargando(true);
 
+    try {
+      // Revisa el límite del plan
+      const permiso = await puedeCrearMapa();
+
+      if (permiso.error) {
+        Alert.alert(
+          'Error',
+          'No se pudo verificar tu plan.'
+        );
+        return;
+      }
+
+      if (!permiso.permitido) {
+        Alert.alert(
+          'Límite alcanzado',
+          `Ya tienes ${permiso.cantidad} mapas. El plan Free permite máximo ${permiso.limite}.`
+        );
+        return;
+      }
+
+      // Genera el mapa con IA
       const { data, error } = await supabase.functions.invoke(
         'generar-mapa',
         {
@@ -112,6 +147,7 @@ export default function InicioScreen({ navigation }) {
 
       if (!user) return;
 
+      // Guarda el mapa
       const { data: mapaGuardado, error: errorGuardar } =
         await supabase
           .from('mapas')
@@ -141,16 +177,6 @@ export default function InicioScreen({ navigation }) {
     }
   };
 
-  // Abre un mapa
-  const abrirMapa = (mapa) => {
-    navigation.navigate('VerMapa', {
-      mapaId: mapa.id,
-      tema: mapa.tema,
-      mapa: mapa.contenido,
-      contenidoFuente: mapa.contenido_fuente,
-    });
-  };
-
   return (
     <ScrollView
       style={[
@@ -162,7 +188,7 @@ export default function InicioScreen({ navigation }) {
     >
       <HeaderMentalis />
 
-      {/* Generador */}
+      {/* Crear mapa */}
       <View style={styles.generador}>
         <TextInput
           style={[
@@ -202,19 +228,18 @@ export default function InicioScreen({ navigation }) {
             styles.boton,
             { backgroundColor: theme.primary },
           ]}
-          onPress={handleCrearMapa}
+          onPress={crearMapa}
           disabled={cargando}
         >
           {cargando ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
             <View style={styles.filaBoton}>
               <Ionicons
                 name="sparkles"
                 size={18}
-                color="#fff"
+                color="#FFFFFF"
               />
-
               <Text style={styles.textoBoton}>
                 Generar mapa
               </Text>
@@ -225,12 +250,7 @@ export default function InicioScreen({ navigation }) {
 
       {/* Mapas recientes */}
       <View style={styles.tituloSeccion}>
-        <Text
-          style={[
-            styles.seccion,
-            { color: theme.text },
-          ]}
-        >
+        <Text style={[styles.seccion, { color: theme.text }]}>
           Tus mapas recientes
         </Text>
 
@@ -257,7 +277,9 @@ export default function InicioScreen({ navigation }) {
           <MapaCard
             key={mapa.id}
             titulo={mapa.tema}
-            conceptos={`${mapa.contenido?.conceptos?.length || 0} conceptos`}
+            conceptos={`${
+              mapa.contenido?.conceptos?.length || 0
+            } conceptos`}
             onPress={() => abrirMapa(mapa)}
           />
         ))
@@ -322,7 +344,7 @@ const styles = StyleSheet.create({
   },
 
   textoBoton: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: 'bold',
   },

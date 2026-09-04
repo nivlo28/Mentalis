@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../services/supabase';
 
-export default function PerfilScreen() {
+export default function PerfilScreen({ navigation }) {
   const { theme, modoOscuro, cambiarTema } = useTheme();
 
   const [nombre, setNombre] = useState('Usuario Mentalis');
@@ -26,7 +26,7 @@ export default function PerfilScreen() {
     cargarPerfil();
   }, []);
 
-  // Carga los datos del usuario
+  // Carga el perfil
   const cargarPerfil = async () => {
     const {
       data: { user },
@@ -42,10 +42,8 @@ export default function PerfilScreen() {
       .eq('user_id', user.id)
       .single();
 
-    if (data) {
-      setNombre(data.nombre || 'Usuario Mentalis');
-      setPlan(data.plan || 'free');
-    }
+    setNombre(data?.nombre || 'Usuario Mentalis');
+    setPlan(data?.plan || 'free');
   };
 
   // Cierra sesión
@@ -54,20 +52,11 @@ export default function PerfilScreen() {
       'Cerrar sesión',
       '¿Seguro que quieres cerrar sesión?',
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Cancelar' },
         {
           text: 'Cerrar sesión',
           style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.auth.signOut();
-
-            if (error) {
-              Alert.alert(
-                'Error',
-                'No se pudo cerrar sesión.'
-              );
-            }
-          },
+          onPress: () => supabase.auth.signOut(),
         },
       ]
     );
@@ -75,10 +64,7 @@ export default function PerfilScreen() {
 
   return (
     <ScrollView
-      style={[
-        styles.container,
-        { backgroundColor: theme.background },
-      ]}
+      style={[styles.container, { backgroundColor: theme.background }]}
       contentContainerStyle={styles.contenido}
       showsVerticalScrollIndicator={false}
     >
@@ -86,12 +72,7 @@ export default function PerfilScreen() {
         Perfil
       </Text>
 
-      <Text
-        style={[
-          styles.subtitulo,
-          { color: theme.secondaryText },
-        ]}
-      >
+      <Text style={[styles.subtitulo, { color: theme.secondaryText }]}>
         Configura tu experiencia en Mentalis
       </Text>
 
@@ -99,7 +80,7 @@ export default function PerfilScreen() {
       <View
         style={[
           styles.card,
-          styles.perfil,
+          styles.fila,
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
@@ -124,23 +105,18 @@ export default function PerfilScreen() {
             {nombre}
           </Text>
 
-          <Text
-            style={[
-              styles.descripcion,
-              { color: theme.secondaryText },
-            ]}
-          >
+          <Text style={[styles.descripcion, { color: theme.secondaryText }]}>
             {email}
           </Text>
         </View>
       </View>
 
-      {/* Plan */}
       <Text style={[styles.seccion, { color: theme.text }]}>
         Tu plan
       </Text>
 
-      <View
+      {/* Plan */}
+      <TouchableOpacity
         style={[
           styles.card,
           styles.fila,
@@ -149,6 +125,9 @@ export default function PerfilScreen() {
             borderColor: theme.border,
           },
         ]}
+        onPress={() =>
+          navigation.navigate('Planes', { planActual: plan })
+        }
       >
         <Ionicons
           name={plan === 'plus' ? 'star' : 'person-outline'}
@@ -158,29 +137,28 @@ export default function PerfilScreen() {
 
         <View style={styles.texto}>
           <Text style={[styles.nombre, { color: theme.text }]}>
-            {plan === 'plus'
-              ? 'Mentalis Plus'
-              : 'Mentalis Free'}
+            {plan === 'plus' ? 'Mentalis Plus' : 'Mentalis Free'}
           </Text>
 
-          <Text
-            style={[
-              styles.descripcion,
-              { color: theme.secondaryText },
-            ]}
-          >
+          <Text style={[styles.descripcion, { color: theme.secondaryText }]}>
             {plan === 'plus'
               ? 'Suscripción activa'
-              : 'Plan gratuito'}
+              : 'Toca para conocer Mentalis Plus'}
           </Text>
         </View>
-      </View>
 
-      {/* Apariencia */}
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={theme.primary}
+        />
+      </TouchableOpacity>
+
       <Text style={[styles.seccion, { color: theme.text }]}>
         Apariencia
       </Text>
 
+      {/* Tema */}
       <View
         style={[
           styles.card,
@@ -202,12 +180,7 @@ export default function PerfilScreen() {
             {modoOscuro ? 'Modo oscuro' : 'Modo claro'}
           </Text>
 
-          <Text
-            style={[
-              styles.descripcion,
-              { color: theme.secondaryText },
-            ]}
-          >
+          <Text style={[styles.descripcion, { color: theme.secondaryText }]}>
             Cambia la apariencia
           </Text>
         </View>
@@ -223,7 +196,7 @@ export default function PerfilScreen() {
         />
       </View>
 
-      {/* Cerrar sesión */}
+      {/* Salir */}
       <TouchableOpacity
         style={[
           styles.cerrar,
@@ -240,12 +213,7 @@ export default function PerfilScreen() {
           color={theme.danger}
         />
 
-        <Text
-          style={[
-            styles.textoCerrar,
-            { color: theme.danger },
-          ]}
-        >
+        <Text style={[styles.textoCerrar, { color: theme.danger }]}>
           Cerrar sesión
         </Text>
       </TouchableOpacity>
@@ -286,11 +254,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 15,
     marginBottom: 25,
-  },
-
-  perfil: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
 
   fila: {

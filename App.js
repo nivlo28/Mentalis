@@ -20,6 +20,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegistroScreen from './src/screens/RegistroScreen';
 import VerMapaScreen from './src/screens/VerMapaScreen';
 import QuizScreen from './src/screens/QuizScreen';
+import PlanesScreen from './src/screens/PlanesScreen';
 
 import TabNavigator from './src/navigation/TabNavigator';
 
@@ -34,15 +35,14 @@ function AppContenido() {
   const [haySesion, setHaySesion] = useState(false);
   const [cargando, setCargando] = useState(true);
 
-  const {
-    theme,
-    modoOscuro,
-  } = useTheme();
+  const { theme, modoOscuro } = useTheme();
 
+  // Revisa si hay una sesión iniciada
   useEffect(() => {
     async function revisarSesion() {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error } =
+          await supabase.auth.getSession();
 
         if (!error) {
           setHaySesion(!!data.session);
@@ -64,11 +64,10 @@ function AppContenido() {
       }
     );
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
+  // Colores de navegación
   const temaNavegacion = {
     ...(modoOscuro ? DarkTheme : DefaultTheme),
 
@@ -130,11 +129,9 @@ function AppContenido() {
               component={VerMapaScreen}
               options={{
                 title: 'Tu Mapa',
-
                 headerStyle: {
                   backgroundColor: theme.card,
                 },
-
                 headerTintColor: theme.text,
               }}
             />
@@ -144,11 +141,21 @@ function AppContenido() {
               component={QuizScreen}
               options={{
                 title: 'Repaso',
-
                 headerStyle: {
                   backgroundColor: theme.card,
                 },
+                headerTintColor: theme.text,
+              }}
+            />
 
+            <Stack.Screen
+              name="Planes"
+              component={PlanesScreen}
+              options={{
+                title: 'Planes',
+                headerStyle: {
+                  backgroundColor: theme.card,
+                },
                 headerTintColor: theme.text,
               }}
             />
