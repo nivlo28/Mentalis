@@ -18,15 +18,15 @@ import { supabase } from '../services/supabase';
 export default function PerfilScreen() {
   const { theme, modoOscuro, cambiarTema } = useTheme();
 
-  // Datos del usuario
+  const [nombre, setNombre] = useState('Usuario Mentalis');
   const [email, setEmail] = useState('');
   const [plan, setPlan] = useState('free');
 
-  // Carga correo y plan
   useEffect(() => {
     cargarPerfil();
   }, []);
 
+  // Carga los datos del usuario
   const cargarPerfil = async () => {
     const {
       data: { user },
@@ -38,11 +38,14 @@ export default function PerfilScreen() {
 
     const { data } = await supabase
       .from('perfiles')
-      .select('plan')
+      .select('nombre, plan')
       .eq('user_id', user.id)
       .single();
 
-    setPlan(data?.plan || 'free');
+    if (data) {
+      setNombre(data.nombre || 'Usuario Mentalis');
+      setPlan(data.plan || 'free');
+    }
   };
 
   // Cierra sesión
@@ -51,15 +54,19 @@ export default function PerfilScreen() {
       'Cerrar sesión',
       '¿Seguro que quieres cerrar sesión?',
       [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
+        { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Cerrar sesión',
           style: 'destructive',
           onPress: async () => {
-            await supabase.auth.signOut();
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+              Alert.alert(
+                'Error',
+                'No se pudo cerrar sesión.'
+              );
+            }
           },
         },
       ]
@@ -73,6 +80,7 @@ export default function PerfilScreen() {
         { backgroundColor: theme.background },
       ]}
       contentContainerStyle={styles.contenido}
+      showsVerticalScrollIndicator={false}
     >
       <Text style={[styles.titulo, { color: theme.text }]}>
         Perfil
@@ -111,21 +119,16 @@ export default function PerfilScreen() {
           />
         </View>
 
-        <View>
-          <Text
-            style={[
-              styles.nombre,
-              { color: theme.text },
-            ]}
-          >
-            Usuario Mentalis
+        <View style={styles.texto}>
+          <Text style={[styles.nombre, { color: theme.text }]}>
+            {nombre}
           </Text>
 
           <Text
-            style={{
-              color: theme.secondaryText,
-              fontSize: 12,
-            }}
+            style={[
+              styles.descripcion,
+              { color: theme.secondaryText },
+            ]}
           >
             {email}
           </Text>
@@ -133,12 +136,7 @@ export default function PerfilScreen() {
       </View>
 
       {/* Plan */}
-      <Text
-        style={[
-          styles.seccion,
-          { color: theme.text },
-        ]}
-      >
+      <Text style={[styles.seccion, { color: theme.text }]}>
         Tu plan
       </Text>
 
@@ -159,22 +157,17 @@ export default function PerfilScreen() {
         />
 
         <View style={styles.texto}>
-          <Text
-            style={[
-              styles.nombre,
-              { color: theme.text },
-            ]}
-          >
+          <Text style={[styles.nombre, { color: theme.text }]}>
             {plan === 'plus'
               ? 'Mentalis Plus'
               : 'Mentalis Free'}
           </Text>
 
           <Text
-            style={{
-              color: theme.secondaryText,
-              fontSize: 12,
-            }}
+            style={[
+              styles.descripcion,
+              { color: theme.secondaryText },
+            ]}
           >
             {plan === 'plus'
               ? 'Suscripción activa'
@@ -184,12 +177,7 @@ export default function PerfilScreen() {
       </View>
 
       {/* Apariencia */}
-      <Text
-        style={[
-          styles.seccion,
-          { color: theme.text },
-        ]}
-      >
+      <Text style={[styles.seccion, { color: theme.text }]}>
         Apariencia
       </Text>
 
@@ -210,22 +198,15 @@ export default function PerfilScreen() {
         />
 
         <View style={styles.texto}>
-          <Text
-            style={[
-              styles.nombre,
-              { color: theme.text },
-            ]}
-          >
-            {modoOscuro
-              ? 'Modo oscuro'
-              : 'Modo claro'}
+          <Text style={[styles.nombre, { color: theme.text }]}>
+            {modoOscuro ? 'Modo oscuro' : 'Modo claro'}
           </Text>
 
           <Text
-            style={{
-              color: theme.secondaryText,
-              fontSize: 12,
-            }}
+            style={[
+              styles.descripcion,
+              { color: theme.secondaryText },
+            ]}
           >
             Cambia la apariencia
           </Text>
@@ -238,6 +219,7 @@ export default function PerfilScreen() {
             false: '#D1D5DB',
             true: theme.primary,
           }}
+          thumbColor="#FFFFFF"
         />
       </View>
 
@@ -255,10 +237,15 @@ export default function PerfilScreen() {
         <Ionicons
           name="log-out-outline"
           size={22}
-          color="#EF4444"
+          color={theme.danger}
         />
 
-        <Text style={styles.textoCerrar}>
+        <Text
+          style={[
+            styles.textoCerrar,
+            { color: theme.danger },
+          ]}
+        >
           Cerrar sesión
         </Text>
       </TouchableOpacity>
@@ -331,6 +318,10 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
 
+  descripcion: {
+    fontSize: 12,
+  },
+
   cerrar: {
     height: 54,
     borderRadius: 14,
@@ -342,7 +333,6 @@ const styles = StyleSheet.create({
   },
 
   textoCerrar: {
-    color: '#EF4444',
     fontSize: 15,
     fontWeight: '600',
   },

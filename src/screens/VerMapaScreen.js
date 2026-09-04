@@ -1,5 +1,5 @@
 import React, {
-  useEffect,
+  useCallback,
   useMemo,
   useState,
 } from 'react';
@@ -11,8 +11,10 @@ import {
   StyleSheet,
 } from 'react-native';
 
+import { useFocusEffect } from '@react-navigation/native';
+
 import ListaEnlazada from '../estructuras/ListaEnlazada';
-import ColaPrioridad from '../estructuras/ColaPrioridad';
+import { obtenerOrdenRepaso } from '../services/repasoService';
 
 import ConceptoCard from '../components/ConceptoCard';
 
@@ -34,13 +36,14 @@ export default function VerMapaScreen({
 
   const [resultados, setResultados] = useState({});
 
-  // Carga resultados guardados
-  useEffect(() => {
-    cargarResultados();
-  }, [mapaId]);
+  // Carga resultados al entrar o volver del quiz
+  useFocusEffect(
+    useCallback(() => {
+      cargarResultados();
+    }, [mapaId])
+  );
 
   const cargarResultados = async () => {
-    // Evita buscar si no hay ID
     if (!mapaId) return;
 
     const { data, error } = await supabase
@@ -62,7 +65,7 @@ export default function VerMapaScreen({
     setResultados(guardados);
   };
 
-  // Crea lista enlazada
+  // Crea la lista enlazada
   const conceptos = useMemo(() => {
     const lista = new ListaEnlazada();
 
@@ -73,34 +76,23 @@ export default function VerMapaScreen({
     return lista.recorrer();
   }, [mapa]);
 
-  // Crea cola de prioridad
-  const ordenRepaso = useMemo(() => {
-    const cola = new ColaPrioridad();
+  // Agrega resultados a los conceptos
+  const conceptosConEstado = useMemo(() => {
+    return conceptos.map((concepto) => {
+      const resultado = resultados[concepto.nombre];
 
-    conceptos.forEach((concepto) => {
-      const resultado =
-        resultados[concepto.nombre];
-
-      let estado = 'sin evaluar';
-      let prioridad = 2;
-
-      if (resultado) {
-        estado = resultado.estado;
-        prioridad = resultado.prioridad;
-      }
-
-      cola.encolar(
-        {
-          ...concepto,
-          estado,
-          porcentaje: resultado?.porcentaje,
-        },
-        prioridad
-      );
+      return {
+        ...concepto,
+        estado: resultado?.estado || 'sin evaluar',
+        porcentaje: resultado?.porcentaje,
+      };
     });
-
-    return cola.recorrer();
   }, [conceptos, resultados]);
+
+  // Ordena usando ColaPrioridad
+  const ordenRepaso = useMemo(() => {
+    return obtenerOrdenRepaso(conceptosConEstado);
+  }, [conceptosConEstado]);
 
   // Abre el quiz
   const abrirQuiz = (concepto) => {
@@ -150,9 +142,7 @@ export default function VerMapaScreen({
         </Text>
 
         <Text
-          style={{
-            color: theme.secondaryText,
-          }}
+          style={{ color: theme.secondaryText }}
         >
           {conceptos.length} conceptos
         </Text>
@@ -234,13 +224,10 @@ export default function VerMapaScreen({
               <Text
                 style={[
                   styles.estado,
-                  {
-                    color: theme.secondaryText,
-                  },
+                  { color: theme.secondaryText },
                 ]}
               >
                 {item.valor.estado}
-
                 {item.valor.porcentaje !== undefined
                   ? ` - ${item.valor.porcentaje}%`
                   : ''}

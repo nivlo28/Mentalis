@@ -1,21 +1,10 @@
 import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
-import {
-  View,
-  Text,
-  StyleSheet,
-} from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
-import {
-  useTheme,
-} from '../context/ThemeContext';
-
-export default function ProgressCard({
-  porcentaje = 0,
-}) {
-  const {
-    theme,
-  } = useTheme();
+export default function ProgressCard({ porcentaje = 0 }) {
+  const { theme } = useTheme();
 
   return (
     <View
@@ -30,17 +19,13 @@ export default function ProgressCard({
       <View
         style={[
           styles.circulo,
-          {
-            borderColor: theme.primary,
-          },
+          { borderColor: theme.primary },
         ]}
       >
         <Text
           style={[
             styles.porcentaje,
-            {
-              color: theme.text,
-            },
+            { color: theme.text },
           ]}
         >
           {porcentaje}%
@@ -51,23 +36,19 @@ export default function ProgressCard({
         <Text
           style={[
             styles.titulo,
-            {
-              color: theme.text,
-            },
+            { color: theme.text },
           ]}
         >
-          Dominio promedio
+          Progreso de estudio
         </Text>
 
         <Text
           style={[
             styles.descripcion,
-            {
-              color: theme.secondaryText,
-            },
+            { color: theme.secondaryText },
           ]}
         >
-          Sigue estudiando para fortalecer tus conceptos.
+          Porcentaje de conceptos que ya has evaluado.
         </Text>
       </View>
     </View>
@@ -78,9 +59,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 14,
     borderWidth: 1,
-
     padding: 18,
-
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -88,14 +67,10 @@ const styles = StyleSheet.create({
   circulo: {
     width: 65,
     height: 65,
-
     borderRadius: 33,
-
     borderWidth: 6,
-
     alignItems: 'center',
     justifyContent: 'center',
-
     marginRight: 16,
   },
 

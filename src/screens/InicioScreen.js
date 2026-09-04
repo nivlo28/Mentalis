@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { supabase } from '../services/supabase';
@@ -27,17 +27,17 @@ export default function InicioScreen({ navigation }) {
   const [tema, setTema] = useState('');
   const [contenidoFuente, setContenidoFuente] = useState('');
   const [cargando, setCargando] = useState(false);
-
   const [mapas, setMapas] = useState([]);
   const [progreso, setProgreso] = useState(0);
 
   // Carga mapas y progreso
   const cargarDatos = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) return;
 
-    // Busca los mapas
     const { data: mapasData } = await supabase
       .from('mapas')
       .select('*')
@@ -45,40 +45,33 @@ export default function InicioScreen({ navigation }) {
       .order('created_at', { ascending: false });
 
     const listaMapas = mapasData || [];
-
-    // Muestra solo los últimos 3
     setMapas(listaMapas.slice(0, 3));
 
-    // Busca resultados de quiz
     const { data: resultados } = await supabase
       .from('resultados_quiz')
       .select('mapa_id, concepto')
       .eq('user_id', user.id);
 
-    // Cuenta todos los conceptos
-    let totalConceptos = 0;
+    const totalConceptos = listaMapas.reduce(
+      (total, mapa) =>
+        total + (mapa.contenido?.conceptos?.length || 0),
+      0
+    );
 
-    listaMapas.forEach((mapa) => {
-      totalConceptos += mapa.contenido?.conceptos?.length || 0;
-    });
-
-    // No cuenta dos veces el mismo concepto
     const evaluados = new Set(
       (resultados || []).map(
         (item) => `${item.mapa_id}-${item.concepto}`
       )
     );
 
-    // Calcula el progreso
-    const porcentaje =
-      totalConceptos > 0
+    setProgreso(
+      totalConceptos
         ? Math.round((evaluados.size / totalConceptos) * 100)
-        : 0;
-
-    setProgreso(porcentaje);
+        : 0
+    );
   };
 
-  // Actualiza cuando entra a Inicio
+  // Actualiza al volver a Inicio
   useFocusEffect(
     useCallback(() => {
       cargarDatos();
@@ -98,7 +91,6 @@ export default function InicioScreen({ navigation }) {
     try {
       setCargando(true);
 
-      // Gemini genera el mapa
       const { data, error } = await supabase.functions.invoke(
         'generar-mapa',
         {
@@ -114,11 +106,12 @@ export default function InicioScreen({ navigation }) {
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) return;
 
-      // Guarda el mapa
       const { data: mapaGuardado, error: errorGuardar } =
         await supabase
           .from('mapas')
@@ -139,14 +132,7 @@ export default function InicioScreen({ navigation }) {
       setTema('');
       setContenidoFuente('');
 
-      // Abre el mapa
-      navigation.navigate('VerMapa', {
-        mapaId: mapaGuardado.id,
-        tema: mapaGuardado.tema,
-        mapa: mapaGuardado.contenido,
-        contenidoFuente: mapaGuardado.contenido_fuente,
-      });
-
+      abrirMapa(mapaGuardado);
     } catch (error) {
       console.log(error);
       Alert.alert('Error', 'Ocurrió un problema.');
@@ -155,7 +141,7 @@ export default function InicioScreen({ navigation }) {
     }
   };
 
-  // Abre un mapa reciente
+  // Abre un mapa
   const abrirMapa = (mapa) => {
     navigation.navigate('VerMapa', {
       mapaId: mapa.id,
@@ -271,9 +257,7 @@ export default function InicioScreen({ navigation }) {
           <MapaCard
             key={mapa.id}
             titulo={mapa.tema}
-            conceptos={
-              `${mapa.contenido?.conceptos?.length || 0} conceptos`
-            }
+            conceptos={`${mapa.contenido?.conceptos?.length || 0} conceptos`}
             onPress={() => abrirMapa(mapa)}
           />
         ))
@@ -287,11 +271,10 @@ export default function InicioScreen({ navigation }) {
           { color: theme.text },
         ]}
       >
-        Tu progreso general
+        Progreso de estudio
       </Text>
 
       <ProgressCard porcentaje={progreso} />
-
     </ScrollView>
   );
 }

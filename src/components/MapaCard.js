@@ -26,8 +26,8 @@ export default function MapaCard({
           borderColor: theme.border,
         },
       ]}
-      activeOpacity={0.8}
       onPress={onPress}
+      activeOpacity={0.8}
     >
       <View
         style={[
@@ -49,9 +49,7 @@ export default function MapaCard({
         <Text
           style={[
             styles.titulo,
-            {
-              color: theme.text,
-            },
+            { color: theme.text },
           ]}
           numberOfLines={1}
         >
@@ -61,9 +59,7 @@ export default function MapaCard({
         <Text
           style={[
             styles.conceptos,
-            {
-              color: theme.secondaryText,
-            },
+            { color: theme.secondaryText },
           ]}
         >
           {conceptos}

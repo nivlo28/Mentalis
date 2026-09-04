@@ -26,7 +26,7 @@ export default function MenuScreen({ navigation }) {
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
 
-  // Carga los mapas
+  // Carga mapas del usuario
   const cargarMapas = async () => {
     setCargando(true);
 
@@ -47,11 +47,10 @@ export default function MenuScreen({ navigation }) {
 
     if (error) {
       console.log('Error cargando mapas:', error);
-      setCargando(false);
-      return;
+    } else {
+      setMapas(data || []);
     }
 
-    setMapas(data || []);
     setCargando(false);
   };
 
@@ -62,7 +61,7 @@ export default function MenuScreen({ navigation }) {
     }, [])
   );
 
-  // Abre el mapa
+  // Abre un mapa
   const abrirMapa = (mapa) => {
     navigation.navigate('VerMapa', {
       mapaId: mapa.id,
@@ -78,14 +77,10 @@ export default function MenuScreen({ navigation }) {
       'Eliminar mapa',
       '¿Seguro que quieres eliminar este mapa?',
       [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
+        { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
-
           onPress: async () => {
             const { error } = await supabase
               .from('mapas')
@@ -97,9 +92,8 @@ export default function MenuScreen({ navigation }) {
               return;
             }
 
-            // Quita el mapa de pantalla
-            setMapas(
-              mapas.filter((mapa) => mapa.id !== id)
+            setMapas((actuales) =>
+              actuales.filter((mapa) => mapa.id !== id)
             );
           },
         },
@@ -107,11 +101,11 @@ export default function MenuScreen({ navigation }) {
     );
   };
 
-  // Filtra mapas
+  // Filtra por tema
   const mapasFiltrados = mapas.filter((mapa) =>
     mapa.tema
       .toLowerCase()
-      .includes(busqueda.toLowerCase())
+      .includes(busqueda.trim().toLowerCase())
   );
 
   return (
@@ -158,27 +152,23 @@ export default function MenuScreen({ navigation }) {
         />
       </View>
 
-      {/* Lista de mapas */}
+      {/* Mapas */}
       <FlatList
         data={mapasFiltrados}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-
         refreshControl={
           <RefreshControl
             refreshing={cargando}
             onRefresh={cargarMapas}
           />
         }
-
         renderItem={({ item }) => (
           <View style={styles.fila}>
             <View style={styles.mapa}>
               <MapaCard
                 titulo={item.tema}
-                conceptos={
-                  `${item.contenido?.conceptos?.length || 0} conceptos`
-                }
+                conceptos={`${item.contenido?.conceptos?.length || 0} conceptos`}
                 onPress={() => abrirMapa(item)}
               />
             </View>
@@ -190,19 +180,17 @@ export default function MenuScreen({ navigation }) {
               <Ionicons
                 name="trash-outline"
                 size={20}
-                color="#EF4444"
+                color={theme.danger}
               />
             </TouchableOpacity>
           </View>
         )}
-
         ListEmptyComponent={
           <Text
-            style={{
-              color: theme.secondaryText,
-              textAlign: 'center',
-              marginTop: 40,
-            }}
+            style={[
+              styles.vacio,
+              { color: theme.secondaryText },
+            ]}
           >
             No tienes mapas.
           </Text>
@@ -252,5 +240,10 @@ const styles = StyleSheet.create({
   eliminar: {
     padding: 12,
     marginLeft: 5,
+  },
+
+  vacio: {
+    textAlign: 'center',
+    marginTop: 40,
   },
 });

@@ -1,4 +1,5 @@
 import React from 'react';
+
 import {
   View,
   Text,
@@ -6,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 
 export default function ConceptoCard({
@@ -31,17 +32,13 @@ export default function ConceptoCard({
       <View
         style={[
           styles.numeroContainer,
-          {
-            backgroundColor: theme.primarySoft,
-          },
+          { backgroundColor: theme.primarySoft },
         ]}
       >
         <Text
           style={[
             styles.numero,
-            {
-              color: theme.primary,
-            },
+            { color: theme.primary },
           ]}
         >
           {numero}
@@ -52,9 +49,7 @@ export default function ConceptoCard({
         <Text
           style={[
             styles.nombre,
-            {
-              color: theme.text,
-            },
+            { color: theme.text },
           ]}
         >
           {concepto.nombre}
@@ -63,12 +58,10 @@ export default function ConceptoCard({
         <Text
           style={[
             styles.requiere,
-            {
-              color: theme.secondaryText,
-            },
+            { color: theme.secondaryText },
           ]}
         >
-          {concepto.requiere?.length > 0
+          {concepto.requiere?.length
             ? `Requiere: ${concepto.requiere.join(', ')}`
             : 'Sin prerrequisitos'}
         </Text>
