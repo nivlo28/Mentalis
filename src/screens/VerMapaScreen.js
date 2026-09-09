@@ -105,16 +105,37 @@ export default function VerMapaScreen({
     return cola.recorrer();
   }, [conceptos, resultados]);
 
-  // Abre el quiz
-  const abrirQuiz = (concepto) => {
-    navigation.navigate('Quiz', {
-      mapaId,
-      concepto,
-      contenidoFuente,
-      tema,
-      mapa,
+  // Guarda el concepto en el historial y abre el quiz
+const abrirQuiz = async (concepto) => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    console.log('No se encontró el usuario');
+    return;
+  }
+
+  const { error } = await supabase
+    .from('historial_estudio')
+    .insert({
+      user_id: user.id,
+      mapa_id: mapaId,
+      concepto: concepto.nombre,
     });
-  };
+
+  if (error) {
+    console.log('Error guardando historial:', error);
+  }
+
+  navigation.navigate('Quiz', {
+    mapaId,
+    concepto,
+    contenidoFuente,
+    tema,
+    mapa,
+  });
+};
 
   return (
     <ScrollView

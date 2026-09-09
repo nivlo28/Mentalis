@@ -285,6 +285,52 @@ export default function InicioScreen({ navigation }) {
         ))
       )}
 
+      {/* Centro de estudio */}
+      <TouchableOpacity
+        style={[
+          styles.centroCard,
+          {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          },
+        ]}
+        onPress={() => navigation.navigate('CentroEstudio')}
+      >
+        <View style={styles.centroIcono}>
+          <Ionicons
+            name="school-outline"
+            size={28}
+            color={theme.primary}
+          />
+        </View>
+
+        <View style={styles.centroInfo}>
+          <Text
+            style={[
+              styles.centroTitulo,
+              { color: theme.text },
+            ]}
+          >
+            Centro de estudio
+          </Text>
+
+          <Text
+            style={[
+              styles.centroDescripcion,
+              { color: theme.secondaryText },
+            ]}
+          >
+            Organiza tus conceptos pendientes y revisa tu historial.
+          </Text>
+        </View>
+
+        <Ionicons
+          name="chevron-forward"
+          size={22}
+          color={theme.secondaryText}
+        />
+      </TouchableOpacity>
+
       {/* Progreso */}
       <Text
         style={[
@@ -315,6 +361,39 @@ const styles = StyleSheet.create({
   generador: {
     marginBottom: 30,
   },
+
+  centroCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderRadius: 13,
+  padding: 16,
+  marginTop: 22,
+},
+
+centroIcono: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 12,
+},
+
+centroInfo: {
+  flex: 1,
+},
+
+centroTitulo: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  marginBottom: 4,
+},
+
+centroDescripcion: {
+  fontSize: 13,
+  lineHeight: 18,
+},
 
   input: {
     height: 54,

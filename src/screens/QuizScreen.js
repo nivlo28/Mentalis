@@ -46,8 +46,13 @@ export default function QuizScreen({ route, navigation }) {
         }
       );
 
-      if (error || !data?.preguntas) {
-        Alert.alert('Error', 'No se pudo generar el quiz.');
+      if (error || !data?.preguntas || data.preguntas.length === 0) {
+        //Alert.alert('Error', 'No se pudo generar el quiz.');
+        console.log('Error generando quiz:', error);
+        console.log('Data quiz:', data);
+        Alert.alert(
+          error?.message || data?.error || 'No se pudo generar el quiz.'
+        );
         return;
       }
 
@@ -224,6 +229,20 @@ export default function QuizScreen({ route, navigation }) {
   }
 
   const pregunta = preguntas[actual];
+  if (!pregunta) {
+  return (
+    <View
+      style={[
+        styles.centro,
+        { backgroundColor: theme.background },
+      ]}
+    >
+      <Text style={{ color: theme.text }}>
+        No se pudo cargar la pregunta.
+      </Text>
+    </View>
+  );
+}
 
   return (
     <View
@@ -284,6 +303,8 @@ export default function QuizScreen({ route, navigation }) {
     </View>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {

@@ -20,6 +20,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegistroScreen from './src/screens/RegistroScreen';
 import VerMapaScreen from './src/screens/VerMapaScreen';
 import QuizScreen from './src/screens/QuizScreen';
+import CentroEstudioScreen from './src/screens/CentroEstudioScreen';
 import PlanesScreen from './src/screens/PlanesScreen';
 
 import TabNavigator from './src/navigation/TabNavigator';
@@ -146,6 +147,11 @@ function AppContenido() {
                 },
                 headerTintColor: theme.text,
               }}
+            />
+
+            <Stack.Screen
+              name="CentroEstudio"
+              component={CentroEstudioScreen}
             />
 
             <Stack.Screen
