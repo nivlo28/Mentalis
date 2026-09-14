@@ -11,10 +11,12 @@ import { useTheme } from '../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../services/supabase';
 import Pila from '../estructuras/Pila';
+import Cola from '../estructuras/Cola';
 
 export default function CentroEstudioScreen() {
   const { theme } = useTheme();
   const [historial, setHistorial] = useState([]);
+  const [pendientes, setPendientes] = useState([]);
 
     const cargarHistorial = async () => {
     const {
@@ -48,6 +50,39 @@ while (!pila.isEmpty()) {
 setHistorial(historialPila);
 
   };
+  const cargarPendientes = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  const { data, error } = await supabase
+    .from('resultados_quiz')
+    .select('*')
+    .eq('user_id', user.id)
+    .in('estado', ['repasar', 'aprendiendo']);
+
+  if (error) {
+    console.log('Error cargando pendientes:', error);
+    return;
+  }
+
+  const cola = new Cola();
+
+  (data || []).forEach((item) => {
+    cola.encolar(item);
+  });
+
+  const pendientesCola = [];
+
+  while (!cola.esVacia()) {
+    pendientesCola.push(cola.desencolar());
+  }
+
+  setPendientes(pendientesCola);
+};
+
   const limpiarHistorial = async () => {
     const {
       data: { user },
@@ -66,6 +101,7 @@ setHistorial(historialPila);
   useFocusEffect(
     useCallback(() => {
         cargarHistorial();
+        cargarPendientes();
     }, [])
   );
 
@@ -85,7 +121,7 @@ setHistorial(historialPila);
         Centro de estudio
       </Text>
 
-      <View
+           <View
         style={[
           styles.card,
           {
@@ -103,16 +139,31 @@ setHistorial(historialPila);
           📚 Conceptos pendientes
         </Text>
 
-        <Text
+        {pendientes.length === 0 ? (
+          <Text
+            style={[
+              styles.descripcion,
+              { color: theme.secondaryText },
+            ]}
+          >
+            No tienes conceptos pendientes.
+          </Text>
+        ) : (
+          pendientes.map((item, index) => (
+            <Text
+              key={item.id}
               style={[
-               styles.descripcion,
-               { color: theme.secondaryText },
-             ]}
-        >
-            Aquí aparecerán los conceptos que tienes
-             pendientes de estudiar.
+                styles.descripcion,
+                {
+                  color: theme.text,
+                  marginBottom: 8,
+                },
+              ]}
+            >
+              {index + 1}. {item.concepto}
             </Text>
-
+          ))
+        )}
       </View>
 
       <View
@@ -175,15 +226,6 @@ setHistorial(historialPila);
   </>
 )}
           
-        <Text
-          style={[
-            styles.descripcion,
-            { color: theme.secondaryText },
-          ]}
-        >
-          Aquí aparecerán los conceptos que has
-          estudiado recientemente.
-        </Text>
       </View>
     </View>
   );
