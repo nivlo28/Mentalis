@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from 'react';
-
 import {
   View,
   Text,
@@ -31,22 +30,21 @@ export default function InicioScreen({ navigation }) {
 
   const [mapas, setMapas] = useState([]);
   const [progreso, setProgreso] = useState(0);
-
   const [racha, setRacha] = useState(0);
   const [retoCompletado, setRetoCompletado] = useState(false);
 
-  // Fecha de hoy
-  const obtenerFechaHoy = () => {
+  // Fecha actual
+  const fechaHoy = () => {
     const hoy = new Date();
 
-    const year = hoy.getFullYear();
-    const month = String(hoy.getMonth() + 1).padStart(2, '0');
-    const day = String(hoy.getDate()).padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
+    return `${hoy.getFullYear()}-${String(
+      hoy.getMonth() + 1
+    ).padStart(2, '0')}-${String(
+      hoy.getDate()
+    ).padStart(2, '0')}`;
   };
 
-  // Carga información de inicio
+  // Carga datos del inicio
   const cargarDatos = async () => {
     const {
       data: { user },
@@ -54,24 +52,26 @@ export default function InicioScreen({ navigation }) {
 
     if (!user) return;
 
+    const hoy = fechaHoy();
+
+    // Perfil
     const { data: perfil } = await supabase
       .from('perfiles')
       .select('racha, ultimo_estudio, ultimo_reto')
       .eq('user_id', user.id)
       .single();
 
-    const hoyTexto = obtenerFechaHoy();
     let rachaActual = perfil?.racha || 0;
 
     // Revisa si perdió la racha
     if (perfil?.ultimo_estudio) {
-      const hoy = new Date(`${hoyTexto}T00:00:00`);
-      const ultimo = new Date(
+      const fechaActual = new Date(`${hoy}T00:00:00`);
+      const ultimoEstudio = new Date(
         `${perfil.ultimo_estudio}T00:00:00`
       );
 
       const diferencia = Math.round(
-        (hoy - ultimo) / (1000 * 60 * 60 * 24)
+        (fechaActual - ultimoEstudio) / 86400000
       );
 
       if (diferencia > 1) {
@@ -80,32 +80,29 @@ export default function InicioScreen({ navigation }) {
     }
 
     setRacha(rachaActual);
+    setRetoCompletado(perfil?.ultimo_reto === hoy);
 
-    setRetoCompletado(
-      perfil?.ultimo_reto === hoyTexto
-    );
-
-    // Mapas del usuario
+    // Mapas
     const { data: mapasData } = await supabase
       .from('mapas')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    const listaMapas = mapasData || [];
+    const todosMapas = mapasData || [];
 
-    setMapas(listaMapas.slice(0, 3));
+    setMapas(todosMapas.slice(0, 3));
 
-    // Resultados de quiz
+    // Resultados
     const { data: resultados } = await supabase
       .from('resultados_quiz')
       .select('mapa_id, concepto')
       .eq('user_id', user.id);
 
-    const totalConceptos = listaMapas.reduce(
-      (total, mapa) =>
+    const totalConceptos = todosMapas.reduce(
+      (total, item) =>
         total +
-        (mapa.contenido?.conceptos?.length || 0),
+        (item.contenido?.conceptos?.length || 0),
       0
     );
 
@@ -115,13 +112,13 @@ export default function InicioScreen({ navigation }) {
       )
     );
 
-    const porcentaje = totalConceptos
-      ? Math.round(
-          (evaluados.size / totalConceptos) * 100
-        )
-      : 0;
-
-    setProgreso(porcentaje);
+    setProgreso(
+      totalConceptos
+        ? Math.round(
+            (evaluados.size / totalConceptos) * 100
+          )
+        : 0
+    );
   };
 
   useFocusEffect(
@@ -130,31 +127,30 @@ export default function InicioScreen({ navigation }) {
     }, [])
   );
 
-  // Abre un mapa
-  const abrirMapa = (mapa) => {
+  // Abre mapa
+  const abrirMapa = (item) => {
     navigation.navigate('VerMapa', {
-      mapaId: mapa.id,
-      tema: mapa.tema,
-      mapa: mapa.contenido,
-      contenidoFuente: mapa.contenido_fuente,
+      mapaId: item.id,
+      tema: item.tema,
+      mapa: item.contenido,
+      contenidoFuente: item.contenido_fuente,
     });
   };
 
-  // Crea un mapa
+  // Crea mapa
   const crearMapa = async () => {
     if (!tema.trim() || !contenidoFuente.trim()) {
       Alert.alert(
         'Faltan datos',
         'Escribe el tema y tus apuntes.'
       );
-
       return;
     }
 
     setCargando(true);
 
     try {
-      // Revisa límite del plan
+      // Revisa Free / Plus
       const permiso = await puedeCrearMapa();
 
       if (permiso.error) {
@@ -162,7 +158,6 @@ export default function InicioScreen({ navigation }) {
           'Error',
           'No se pudo verificar tu plan.'
         );
-
         return;
       }
 
@@ -171,11 +166,10 @@ export default function InicioScreen({ navigation }) {
           'Límite alcanzado',
           `Tu plan Free permite máximo ${permiso.limite} mapas.`
         );
-
         return;
       }
 
-      // Genera mapa con IA
+      // Genera con IA
       const { data, error } =
         await supabase.functions.invoke(
           'generar-mapa',
@@ -193,7 +187,6 @@ export default function InicioScreen({ navigation }) {
           'Error',
           'No se pudo generar el mapa.'
         );
-
         return;
       }
 
@@ -224,7 +217,6 @@ export default function InicioScreen({ navigation }) {
           'Error',
           'No se pudo guardar el mapa.'
         );
-
         return;
       }
 
@@ -248,53 +240,50 @@ export default function InicioScreen({ navigation }) {
     <ScrollView
       style={[
         styles.container,
-        {
-          backgroundColor: theme.background,
-        },
+        { backgroundColor: theme.background },
       ]}
       contentContainerStyle={styles.contenido}
       showsVerticalScrollIndicator={false}
     >
+      {/* Saludo */}
       <HeaderMentalis />
 
-      {/* Racha y reto */}
+      {/* Racha + reto */}
       <View
         style={[
-          styles.estudioCard,
+          styles.estudio,
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
           },
         ]}
       >
-        <View style={styles.rachaParte}>
-          <View style={styles.iconoFila}>
-            <Ionicons
-              name="flame"
-              size={25}
-              color="#FF8A00"
-            />
+        <View style={styles.racha}>
+          <Ionicons
+            name="flame"
+            size={24}
+            color="#FF8A00"
+          />
 
+          <View>
             <Text
               style={[
-                styles.numeroRacha,
+                styles.numero,
                 { color: theme.text },
               ]}
             >
-              {racha}
+              {racha} {racha === 1 ? 'día' : 'días'}
+            </Text>
+
+            <Text
+              style={[
+                styles.pequeno,
+                { color: theme.secondaryText },
+              ]}
+            >
+              de racha
             </Text>
           </View>
-
-          <Text
-            style={[
-              styles.textoPequeno,
-              { color: theme.secondaryText },
-            ]}
-          >
-            {racha === 1
-              ? 'día de racha'
-              : 'días de racha'}
-          </Text>
         </View>
 
         <View
@@ -305,40 +294,38 @@ export default function InicioScreen({ navigation }) {
         />
 
         <TouchableOpacity
-          style={styles.retoParte}
+          style={styles.reto}
           onPress={() =>
             navigation.navigate('RetoDiario')
           }
         >
-          <View style={styles.retoTexto}>
-            <View style={styles.iconoFila}>
-              <Ionicons
-                name={
-                  retoCompletado
-                    ? 'checkmark-circle'
-                    : 'flash'
-                }
-                size={20}
-                color={
-                  retoCompletado
-                    ? '#22C55E'
-                    : theme.primary
-                }
-              />
+          <Ionicons
+            name={
+              retoCompletado
+                ? 'checkmark-circle'
+                : 'flash'
+            }
+            size={22}
+            color={
+              retoCompletado
+                ? '#22C55E'
+                : theme.primary
+            }
+          />
 
-              <Text
-                style={[
-                  styles.retoTitulo,
-                  { color: theme.text },
-                ]}
-              >
-                Reto diario
-              </Text>
-            </View>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[
+                styles.retoTitulo,
+                { color: theme.text },
+              ]}
+            >
+              Reto diario
+            </Text>
 
             <Text
               style={[
-                styles.textoPequeno,
+                styles.pequeno,
                 { color: theme.secondaryText },
               ]}
             >
@@ -350,84 +337,109 @@ export default function InicioScreen({ navigation }) {
 
           <Ionicons
             name="chevron-forward"
-            size={19}
+            size={18}
             color={theme.secondaryText}
           />
         </TouchableOpacity>
       </View>
 
-      {/* Crear mapa */}
-      <View style={styles.generador}>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.input,
-              borderColor: theme.border,
-              color: theme.text,
-            },
-          ]}
-          placeholder="Ej: Listas enlazadas..."
-          placeholderTextColor={theme.secondaryText}
-          value={tema}
-          onChangeText={setTema}
+      {/* Generador */}
+      <View style={styles.seccionHeader}>
+        <View>
+          <Text
+            style={[
+              styles.titulo,
+              { color: theme.text },
+            ]}
+          >
+            Crear mapa
+          </Text>
+
+          <Text
+            style={[
+              styles.descripcion,
+              { color: theme.secondaryText },
+            ]}
+          >
+            Convierte tus apuntes en un mapa de estudio
+          </Text>
+        </View>
+
+        <Ionicons
+          name="sparkles"
+          size={20}
+          color={theme.primary}
         />
-
-        <TextInput
-          style={[
-            styles.input,
-            styles.inputGrande,
-            {
-              backgroundColor: theme.input,
-              borderColor: theme.border,
-              color: theme.text,
-            },
-          ]}
-          placeholder="Escribe aquí tus apuntes..."
-          placeholderTextColor={theme.secondaryText}
-          value={contenidoFuente}
-          onChangeText={setContenidoFuente}
-          multiline
-          textAlignVertical="top"
-        />
-
-        <TouchableOpacity
-          style={[
-            styles.boton,
-            {
-              backgroundColor: theme.primary,
-            },
-          ]}
-          onPress={crearMapa}
-          disabled={cargando}
-        >
-          {cargando ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <View style={styles.filaBoton}>
-              <Ionicons
-                name="sparkles"
-                size={18}
-                color="#FFFFFF"
-              />
-
-              <Text style={styles.textoBoton}>
-                Generar mapa
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
       </View>
 
+      <TextInput
+        style={[
+          styles.input,
+          {
+            backgroundColor: theme.input,
+            borderColor: theme.border,
+            color: theme.text,
+          },
+        ]}
+        placeholder="Tema, ej: Listas enlazadas"
+        placeholderTextColor={theme.secondaryText}
+        value={tema}
+        onChangeText={setTema}
+      />
+
+      <TextInput
+        style={[
+          styles.input,
+          styles.apuntes,
+          {
+            backgroundColor: theme.input,
+            borderColor: theme.border,
+            color: theme.text,
+          },
+        ]}
+        placeholder="Escribe o pega tus apuntes..."
+        placeholderTextColor={theme.secondaryText}
+        value={contenidoFuente}
+        onChangeText={setContenidoFuente}
+        multiline
+        textAlignVertical="top"
+      />
+
+      <TouchableOpacity
+        style={[
+          styles.boton,
+          { backgroundColor: theme.primary },
+          cargando && { opacity: 0.6 },
+        ]}
+        onPress={crearMapa}
+        disabled={cargando}
+      >
+        {cargando ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <>
+            <Ionicons
+              name="sparkles"
+              size={18}
+              color="#FFFFFF"
+            />
+
+            <Text style={styles.botonTexto}>
+              Generar mapa
+            </Text>
+          </>
+        )}
+      </TouchableOpacity>
+
       {/* Mapas recientes */}
-      <View style={styles.tituloSeccion}>
+      <View style={styles.mapasHeader}>
         <Text
           style={[
-            styles.seccion,
+            styles.titulo,
             { color: theme.text },
           ]}
         >
-          Tus mapas recientes
+          Mapas recientes
         </Text>
 
         <TouchableOpacity
@@ -446,31 +458,57 @@ export default function InicioScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {mapas.length === 0 ? (
-        <Text
-          style={{
-            color: theme.secondaryText,
-          }}
-        >
-          Todavía no tienes mapas.
-        </Text>
-      ) : (
-        mapas.map((mapa) => (
+      {mapas.length > 0 ? (
+        mapas.map((item) => (
           <MapaCard
-            key={mapa.id}
-            titulo={mapa.tema}
+            key={item.id}
+            titulo={item.tema}
             conceptos={`${
-              mapa.contenido?.conceptos?.length || 0
+              item.contenido?.conceptos?.length || 0
             } conceptos`}
-            onPress={() => abrirMapa(mapa)}
+            onPress={() => abrirMapa(item)}
           />
         ))
+      ) : (
+        <View
+          style={[
+            styles.vacio,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name="map-outline"
+            size={25}
+            color={theme.secondaryText}
+          />
+
+          <Text
+            style={[
+              styles.vacioTitulo,
+              { color: theme.text },
+            ]}
+          >
+            Aún no tienes mapas
+          </Text>
+
+          <Text
+            style={[
+              styles.pequeno,
+              { color: theme.secondaryText },
+            ]}
+          >
+            Crea uno usando tus apuntes.
+          </Text>
+        </View>
       )}
 
       {/* Centro de estudio */}
       <TouchableOpacity
         style={[
-          styles.centroCard,
+          styles.centro,
           {
             backgroundColor: theme.card,
             borderColor: theme.border,
@@ -480,15 +518,20 @@ export default function InicioScreen({ navigation }) {
           navigation.navigate('CentroEstudio')
         }
       >
-        <View style={styles.centroIcono}>
+        <View
+          style={[
+            styles.centroIcono,
+            { backgroundColor: theme.primarySoft },
+          ]}
+        >
           <Ionicons
             name="school-outline"
-            size={28}
+            size={24}
             color={theme.primary}
           />
         </View>
 
-        <View style={styles.centroInfo}>
+        <View style={{ flex: 1 }}>
           <Text
             style={[
               styles.centroTitulo,
@@ -500,34 +543,41 @@ export default function InicioScreen({ navigation }) {
 
           <Text
             style={[
-              styles.centroDescripcion,
-              {
-                color: theme.secondaryText,
-              },
+              styles.pequeno,
+              { color: theme.secondaryText },
             ]}
           >
-            Organiza tus conceptos pendientes y revisa tu
-            historial.
+            Repasa conceptos y revisa tu historial
           </Text>
         </View>
 
         <Ionicons
           name="chevron-forward"
-          size={22}
+          size={20}
           color={theme.secondaryText}
         />
       </TouchableOpacity>
 
       {/* Progreso */}
-      <Text
-        style={[
-          styles.seccion,
-          styles.progresoTitulo,
-          { color: theme.text },
-        ]}
-      >
-        Progreso de estudio
-      </Text>
+      <View style={styles.progresoHeader}>
+        <Text
+          style={[
+            styles.titulo,
+            { color: theme.text },
+          ]}
+        >
+          Tu progreso
+        </Text>
+
+        <Text
+          style={[
+            styles.porcentaje,
+            { color: theme.primary },
+          ]}
+        >
+          {progreso}%
+        </Text>
+      </View>
 
       <ProgressCard porcentaje={progreso} />
     </ScrollView>
@@ -545,49 +595,43 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  estudioCard: {
+  estudio: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 15,
     padding: 14,
-    marginBottom: 22,
+    marginBottom: 28,
   },
 
-  rachaParte: {
-    width: 95,
-  },
-
-  iconoFila: {
+  racha: {
+    width: 110,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
 
-  numeroRacha: {
-    fontSize: 20,
+  numero: {
+    fontSize: 15,
     fontWeight: 'bold',
   },
 
-  textoPequeno: {
+  pequeno: {
     fontSize: 11,
-    marginTop: 3,
+    marginTop: 2,
   },
 
   divisor: {
     width: 1,
     height: 40,
-    marginHorizontal: 14,
+    marginHorizontal: 12,
   },
 
-  retoParte: {
+  reto: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-
-  retoTexto: {
-    flex: 1,
+    gap: 8,
   },
 
   retoTitulo: {
@@ -595,90 +639,106 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  generador: {
-    marginBottom: 30,
-  },
-
-  input: {
-    height: 54,
-    borderRadius: 13,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    fontSize: 15,
-    marginBottom: 12,
-  },
-
-  inputGrande: {
-    height: 130,
-    paddingTop: 14,
-  },
-
-  boton: {
-    height: 52,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  filaBoton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
-  textoBoton: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-
-  tituloSeccion: {
+  seccionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 13,
   },
 
-  seccion: {
-    fontSize: 16,
+  titulo: {
+    fontSize: 17,
     fontWeight: 'bold',
   },
 
-  centroCard: {
+  descripcion: {
+    fontSize: 12,
+    marginTop: 3,
+  },
+
+  input: {
+    height: 52,
+    borderWidth: 1,
+    borderRadius: 13,
+    paddingHorizontal: 15,
+    fontSize: 14,
+    marginBottom: 11,
+  },
+
+  apuntes: {
+    height: 120,
+    paddingTop: 13,
+  },
+
+  boton: {
+    height: 51,
+    borderRadius: 13,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 7,
+  },
+
+  botonTexto: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+
+  mapasHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 30,
+    marginBottom: 12,
+  },
+
+  vacio: {
+    borderWidth: 1,
+    borderRadius: 13,
+    padding: 20,
+    alignItems: 'center',
+  },
+
+  vacioTitulo: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 7,
+  },
+
+  centro: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 13,
-    padding: 16,
+    borderRadius: 14,
+    padding: 14,
     marginTop: 22,
+    gap: 11,
   },
 
   centroIcono: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 43,
+    height: 43,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-  },
-
-  centroInfo: {
-    flex: 1,
   },
 
   centroTitulo: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
 
-  centroDescripcion: {
-    fontSize: 13,
-    lineHeight: 18,
+  progresoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 11,
   },
 
-  progresoTitulo: {
-    marginTop: 22,
-    marginBottom: 12,
+  porcentaje: {
+    fontSize: 17,
+    fontWeight: 'bold',
   },
 });

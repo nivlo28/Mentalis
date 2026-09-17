@@ -21,25 +21,42 @@ import { useTheme } from '../context/ThemeContext';
 export default function RegistroScreen({ navigation }) {
   const { theme } = useTheme();
 
-  // Datos del usuario
   const [nombre, setNombre] = useState('');
-  const [fechaNacimiento, setFechaNacimiento] = useState('');
+  const [fecha, setFecha] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmarPassword, setConfirmarPassword] = useState('');
+  const [confirmar, setConfirmar] = useState('');
 
   const [cargando, setCargando] = useState(false);
-  const [mostrarPassword, setMostrarPassword] = useState(false);
-  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+  const [verPassword, setVerPassword] = useState(false);
+  const [verConfirmar, setVerConfirmar] = useState(false);
+
+  // Formatea AAAA-MM-DD
+  const cambiarFecha = (texto) => {
+    const n = texto.replace(/\D/g, '').slice(0, 8);
+
+    let resultado = n;
+
+    if (n.length > 4) {
+      resultado = `${n.slice(0, 4)}-${n.slice(4)}`;
+    }
+
+    if (n.length > 6) {
+      resultado =
+        `${n.slice(0, 4)}-${n.slice(4, 6)}-${n.slice(6)}`;
+    }
+
+    setFecha(resultado);
+  };
 
   // Crea la cuenta
-  const handleRegistro = async () => {
+  const registrar = async () => {
     if (
       !nombre.trim() ||
-      !fechaNacimiento.trim() ||
+      !fecha ||
       !email.trim() ||
-      !password.trim() ||
-      !confirmarPassword.trim()
+      !password ||
+      !confirmar
     ) {
       Alert.alert(
         'Datos incompletos',
@@ -48,10 +65,18 @@ export default function RegistroScreen({ navigation }) {
       return;
     }
 
-    if (password !== confirmarPassword) {
+    if (!/\S+@\S+\.\S+/.test(email)) {
       Alert.alert(
-        'Contraseñas diferentes',
-        'Las contraseñas no coinciden.'
+        'Correo inválido',
+        'Ingresa un correo válido.'
+      );
+      return;
+    }
+
+    if (fecha.length !== 10) {
+      Alert.alert(
+        'Fecha inválida',
+        'Usa el formato AAAA-MM-DD.'
       );
       return;
     }
@@ -59,7 +84,15 @@ export default function RegistroScreen({ navigation }) {
     if (password.length < 6) {
       Alert.alert(
         'Contraseña muy corta',
-        'Debe tener al menos 6 caracteres.'
+        'Debe tener mínimo 6 caracteres.'
+      );
+      return;
+    }
+
+    if (password !== confirmar) {
+      Alert.alert(
+        'Contraseñas diferentes',
+        'Las contraseñas no coinciden.'
       );
       return;
     }
@@ -67,39 +100,45 @@ export default function RegistroScreen({ navigation }) {
     try {
       setCargando(true);
 
-      // Crea usuario en Supabase Auth
       const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
+
+        options: {
+          data: {
+            nombre: nombre.trim(),
+            fecha_nacimiento: fecha,
+          },
+        },
       });
 
       if (error) {
-        Alert.alert('Error', error.message);
+        Alert.alert(
+          'No se pudo crear la cuenta',
+          error.message
+        );
         return;
       }
 
-      // Guarda nombre y fecha en perfiles
-      if (data.user) {
-        await supabase
-          .from('perfiles')
-          .update({
-            nombre: nombre.trim(),
-            fecha_nacimiento: fechaNacimiento,
-          })
-          .eq('user_id', data.user.id);
+      if (!data.user) {
+        Alert.alert(
+          'Error',
+          'No se pudo crear el usuario.'
+        );
+        return;
       }
 
-      Alert.alert(
-        'Cuenta creada',
-        'Tu cuenta fue creada correctamente.',
-        [
-          {
-            text: 'Continuar',
-            onPress: () => navigation.navigate('Login'),
-          },
-        ]
-      );
-
+      if (data.session) {
+        Alert.alert(
+          'Cuenta creada',
+          `Bienvenido a Mentalis, ${nombre.trim().split(' ')[0]}.`
+        );
+      } else {
+        Alert.alert(
+          'Cuenta creada',
+          'Revisa tu correo para confirmar tu cuenta.'
+        );
+      }
     } catch (error) {
       console.log('Error registro:', error);
 
@@ -107,7 +146,6 @@ export default function RegistroScreen({ navigation }) {
         'Error',
         'Ocurrió un problema al crear la cuenta.'
       );
-
     } finally {
       setCargando(false);
     }
@@ -119,28 +157,40 @@ export default function RegistroScreen({ navigation }) {
         styles.container,
         { backgroundColor: theme.background },
       ]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : undefined
+      }
     >
       <ScrollView
         contentContainerStyle={styles.contenido}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Logo */}
-        <View style={styles.logoContainer}>
+        <View style={styles.encabezado}>
           <View
             style={[
               styles.logoIcono,
-              { backgroundColor: theme.primarySoft },
+              {
+                backgroundColor: theme.primarySoft,
+              },
             ]}
           >
             <Ionicons
               name="bulb-outline"
-              size={34}
+              size={30}
               color={theme.primary}
             />
           </View>
 
-          <Text style={[styles.logo, { color: theme.text }]}>
+          <Text
+            style={[
+              styles.logo,
+              { color: theme.text },
+            ]}
+          >
             Mentalis
           </Text>
 
@@ -150,11 +200,11 @@ export default function RegistroScreen({ navigation }) {
               { color: theme.secondaryText },
             ]}
           >
-            Empieza a organizar tu aprendizaje
+            Tu espacio para aprender mejor
           </Text>
         </View>
 
-        {/* Tarjeta */}
+        {/* Formulario */}
         <View
           style={[
             styles.card,
@@ -164,7 +214,12 @@ export default function RegistroScreen({ navigation }) {
             },
           ]}
         >
-          <Text style={[styles.titulo, { color: theme.text }]}>
+          <Text
+            style={[
+              styles.titulo,
+              { color: theme.text },
+            ]}
+          >
             Crear cuenta
           </Text>
 
@@ -174,218 +229,119 @@ export default function RegistroScreen({ navigation }) {
               { color: theme.secondaryText },
             ]}
           >
-            Regístrate para comenzar
+            Empieza a estudiar con Mentalis
           </Text>
 
-          {/* Nombre */}
-          <Text style={[styles.label, { color: theme.text }]}>
-            Nombre completo
-          </Text>
+          <Campo
+            icono="person-outline"
+            placeholder="Nombre completo"
+            value={nombre}
+            onChangeText={setNombre}
+            theme={theme}
+          />
 
-          <View
-            style={[
-              styles.inputContainer,
-              {
-                backgroundColor: theme.input,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons
-              name="person-outline"
-              size={20}
-              color={theme.secondaryText}
-            />
+          <Campo
+            icono="calendar-outline"
+            placeholder="Fecha de nacimiento  AAAA-MM-DD"
+            value={fecha}
+            onChangeText={cambiarFecha}
+            keyboardType="number-pad"
+            maxLength={10}
+            theme={theme}
+          />
 
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              placeholder="Tu nombre"
-              placeholderTextColor={theme.secondaryText}
-              value={nombre}
-              onChangeText={setNombre}
-              editable={!cargando}
-            />
-          </View>
+          <Campo
+            icono="mail-outline"
+            placeholder="Correo electrónico"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            theme={theme}
+          />
 
-          {/* Fecha */}
-          <Text style={[styles.label, { color: theme.text }]}>
-            Fecha de nacimiento
-          </Text>
-
-          <View
-            style={[
-              styles.inputContainer,
-              {
-                backgroundColor: theme.input,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color={theme.secondaryText}
-            />
-
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              placeholder="2001-01-01"
-              placeholderTextColor={theme.secondaryText}
-              value={fechaNacimiento}
-              onChangeText={setFechaNacimiento}
-              keyboardType="numbers-and-punctuation"
-              editable={!cargando}
-            />
-          </View>
-
-          {/* Correo */}
-          <Text style={[styles.label, { color: theme.text }]}>
-            Correo
-          </Text>
-
-          <View
-            style={[
-              styles.inputContainer,
-              {
-                backgroundColor: theme.input,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons
-              name="mail-outline"
-              size={20}
-              color={theme.secondaryText}
-            />
-
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              placeholder="correo@ejemplo.com"
-              placeholderTextColor={theme.secondaryText}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!cargando}
-            />
-          </View>
-
-          {/* Contraseña */}
-          <Text style={[styles.label, { color: theme.text }]}>
-            Contraseña
-          </Text>
-
-          <View
-            style={[
-              styles.inputContainer,
-              {
-                backgroundColor: theme.input,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color={theme.secondaryText}
-            />
-
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              placeholder="Mínimo 6 caracteres"
-              placeholderTextColor={theme.secondaryText}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!mostrarPassword}
-              editable={!cargando}
-            />
-
-            <TouchableOpacity
-              onPress={() => setMostrarPassword(!mostrarPassword)}
-            >
-              <Ionicons
-                name={
-                  mostrarPassword
-                    ? 'eye-off-outline'
-                    : 'eye-outline'
+          <Campo
+            icono="lock-closed-outline"
+            placeholder="Contraseña"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!verPassword}
+            theme={theme}
+            derecha={
+              <TouchableOpacity
+                onPress={() =>
+                  setVerPassword(!verPassword)
                 }
-                size={21}
-                color={theme.secondaryText}
-              />
-            </TouchableOpacity>
-          </View>
+              >
+                <Ionicons
+                  name={
+                    verPassword
+                      ? 'eye-off-outline'
+                      : 'eye-outline'
+                  }
+                  size={21}
+                  color={theme.secondaryText}
+                />
+              </TouchableOpacity>
+            }
+          />
 
-          {/* Confirmar contraseña */}
-          <Text style={[styles.label, { color: theme.text }]}>
-            Confirmar contraseña
-          </Text>
-
-          <View
-            style={[
-              styles.inputContainer,
-              {
-                backgroundColor: theme.input,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Ionicons
-              name="shield-checkmark-outline"
-              size={20}
-              color={theme.secondaryText}
-            />
-
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              placeholder="Repite tu contraseña"
-              placeholderTextColor={theme.secondaryText}
-              value={confirmarPassword}
-              onChangeText={setConfirmarPassword}
-              secureTextEntry={!mostrarConfirmacion}
-              editable={!cargando}
-            />
-
-            <TouchableOpacity
-              onPress={() =>
-                setMostrarConfirmacion(!mostrarConfirmacion)
-              }
-            >
-              <Ionicons
-                name={
-                  mostrarConfirmacion
-                    ? 'eye-off-outline'
-                    : 'eye-outline'
+          <Campo
+            icono="shield-checkmark-outline"
+            placeholder="Confirmar contraseña"
+            value={confirmar}
+            onChangeText={setConfirmar}
+            secureTextEntry={!verConfirmar}
+            theme={theme}
+            derecha={
+              <TouchableOpacity
+                onPress={() =>
+                  setVerConfirmar(!verConfirmar)
                 }
-                size={21}
-                color={theme.secondaryText}
-              />
-            </TouchableOpacity>
-          </View>
+              >
+                <Ionicons
+                  name={
+                    verConfirmar
+                      ? 'eye-off-outline'
+                      : 'eye-outline'
+                  }
+                  size={21}
+                  color={theme.secondaryText}
+                />
+              </TouchableOpacity>
+            }
+          />
 
-          {/* Botón */}
           <TouchableOpacity
             style={[
               styles.boton,
               { backgroundColor: theme.primary },
-              cargando && styles.botonDeshabilitado,
+              cargando && { opacity: 0.6 },
             ]}
-            onPress={handleRegistro}
+            onPress={registrar}
             disabled={cargando}
           >
             {cargando ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.textoBoton}>
-                Crear cuenta
-              </Text>
+              <>
+                <Text style={styles.botonTexto}>
+                  Crear cuenta
+                </Text>
+
+                <Ionicons
+                  name="arrow-forward"
+                  size={18}
+                  color="#FFFFFF"
+                />
+              </>
             )}
           </TouchableOpacity>
 
-          {/* Login */}
-          <View style={styles.loginContainer}>
+          <View style={styles.login}>
             <Text
               style={[
-                styles.textoLogin,
+                styles.loginTexto,
                 { color: theme.secondaryText },
               ]}
             >
@@ -393,7 +349,9 @@ export default function RegistroScreen({ navigation }) {
             </Text>
 
             <TouchableOpacity
-              onPress={() => navigation.navigate('Login')}
+              onPress={() =>
+                navigation.navigate('Login')
+              }
             >
               <Text
                 style={[
@@ -411,72 +369,107 @@ export default function RegistroScreen({ navigation }) {
   );
 }
 
+// Input reutilizable
+function Campo({
+  icono,
+  theme,
+  derecha,
+  ...props
+}) {
+  return (
+    <View
+      style={[
+        styles.inputContainer,
+        {
+          backgroundColor: theme.input,
+          borderColor: theme.border,
+        },
+      ]}
+    >
+      <Ionicons
+        name={icono}
+        size={19}
+        color={theme.secondaryText}
+      />
+
+      <TextInput
+        {...props}
+        style={[
+          styles.input,
+          { color: theme.text },
+        ]}
+        placeholderTextColor={theme.secondaryText}
+      />
+
+      {derecha}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
 
   contenido: {
+    flexGrow: 1,
+    justifyContent: 'center',
     paddingHorizontal: 22,
     paddingVertical: 35,
   },
 
-  logoContainer: {
+  encabezado: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
   },
 
   logoIcono: {
-    width: 60,
-    height: 60,
+    width: 58,
+    height: 58,
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 9,
   },
 
   logo: {
     fontSize: 27,
     fontWeight: 'bold',
-    marginBottom: 5,
   },
 
   descripcion: {
     fontSize: 13,
-    textAlign: 'center',
+    marginTop: 5,
   },
 
   card: {
+    width: '100%',
+    maxWidth: 500,
+    alignSelf: 'center',
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 20,
   },
 
   titulo: {
     fontSize: 23,
     fontWeight: 'bold',
-    marginBottom: 5,
   },
 
   subtitulo: {
     fontSize: 13,
+    marginTop: 4,
     marginBottom: 20,
   },
 
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-
   inputContainer: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 13,
+    minHeight: 53,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    borderWidth: 1,
+    borderRadius: 13,
+    paddingHorizontal: 14,
+    marginBottom: 12,
   },
 
   input: {
@@ -487,31 +480,29 @@ const styles = StyleSheet.create({
   },
 
   boton: {
-    height: 52,
-    borderRadius: 12,
+    height: 53,
+    borderRadius: 13,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 7,
+    gap: 8,
+    marginTop: 5,
   },
 
-  botonDeshabilitado: {
-    opacity: 0.6,
-  },
-
-  textoBoton: {
+  botonTexto: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: 'bold',
   },
 
-  loginContainer: {
+  login: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 19,
     gap: 5,
+    marginTop: 19,
   },
 
-  textoLogin: {
+  loginTexto: {
     fontSize: 13,
   },
 
