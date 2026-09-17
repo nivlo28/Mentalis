@@ -12,21 +12,26 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '../context/ThemeContext';
+import { usePlan } from '../context/PlanContext';
 
-export default function PlanesScreen({ route }) {
+export default function PlanesScreen() {
   const { theme } = useTheme();
+  const { plan, esPlus } = usePlan();
 
-  const plan = route.params?.planActual || 'free';
-
+  // Comparación Free y Plus
   const beneficios = [
     ['Mapas con IA', true, true],
     ['Quiz por concepto', true, true],
+    ['Racha de estudio', true, true],
     ['Prioridad de repaso', true, true],
     ['Máximo de mapas', '3', 'Ilimitados'],
+    ['Modo examen', '1 diario', 'Ilimitado'],
+    ['Explícamelo fácil', 'Limitado', 'Ilimitado'],
+    ['Preguntar apuntes', false, true],
     ['Subir archivos PDF', false, true],
   ];
 
-  // Muestra cada beneficio
+  // Muestra check, X o texto
   const valor = (dato) => {
     if (typeof dato === 'boolean') {
       return (
@@ -47,26 +52,35 @@ export default function PlanesScreen({ route }) {
     }
 
     return (
-      <Text style={[styles.valor, { color: theme.text }]}>
+      <Text
+        style={[
+          styles.valor,
+          { color: theme.text },
+        ]}
+      >
         {dato}
       </Text>
     );
   };
 
-  // Pago se agrega después
+  // Pago real se agrega después
   const mejorarPlan = () => {
     Alert.alert(
       'Mentalis Plus',
-      'Próximamente podrás suscribirte con PayPal.'
+      'Próximamente podrás suscribirte a Mentalis Plus.'
     );
   };
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
+      style={[
+        styles.container,
+        { backgroundColor: theme.background },
+      ]}
       contentContainerStyle={styles.contenido}
       showsVerticalScrollIndicator={false}
     >
+      {/* Icono */}
       <View
         style={[
           styles.icono,
@@ -75,16 +89,26 @@ export default function PlanesScreen({ route }) {
       >
         <Ionicons
           name="star"
-          size={35}
+          size={34}
           color={theme.primary}
         />
       </View>
 
-      <Text style={[styles.titulo, { color: theme.text }]}>
+      <Text
+        style={[
+          styles.titulo,
+          { color: theme.text },
+        ]}
+      >
         Mentalis Plus
       </Text>
 
-      <Text style={[styles.subtitulo, { color: theme.secondaryText }]}>
+      <Text
+        style={[
+          styles.subtitulo,
+          { color: theme.secondaryText },
+        ]}
+      >
         Lleva tus mapas y repasos a otro nivel.
       </Text>
 
@@ -94,22 +118,77 @@ export default function PlanesScreen({ route }) {
           styles.card,
           {
             backgroundColor: theme.card,
-            borderColor: theme.border,
+            borderColor: esPlus
+              ? theme.primary
+              : theme.border,
           },
         ]}
       >
-        <Text style={{ color: theme.secondaryText }}>
-          Tu plan actual
-        </Text>
+        <View style={styles.planFila}>
+          <View>
+            <Text
+              style={{
+                color: theme.secondaryText,
+                fontSize: 12,
+              }}
+            >
+              Tu plan actual
+            </Text>
 
-        <Text style={[styles.plan, { color: theme.text }]}>
-          {plan === 'plus'
-            ? 'Mentalis Plus'
-            : 'Mentalis Free'}
-        </Text>
+            <Text
+              style={[
+                styles.plan,
+                { color: theme.text },
+              ]}
+            >
+              {esPlus
+                ? 'Mentalis Plus'
+                : 'Mentalis Free'}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.etiqueta,
+              {
+                backgroundColor: esPlus
+                  ? theme.primarySoft
+                  : theme.cardSecondary,
+              },
+            ]}
+          >
+            <Ionicons
+              name={esPlus ? 'star' : 'person'}
+              size={14}
+              color={
+                esPlus
+                  ? theme.primary
+                  : theme.secondaryText
+              }
+            />
+
+            <Text
+              style={[
+                styles.etiquetaTexto,
+                {
+                  color: esPlus
+                    ? theme.primary
+                    : theme.secondaryText,
+                },
+              ]}
+            >
+              {plan?.toUpperCase()}
+            </Text>
+          </View>
+        </View>
       </View>
 
-      <Text style={[styles.seccion, { color: theme.text }]}>
+      <Text
+        style={[
+          styles.seccion,
+          { color: theme.text },
+        ]}
+      >
         Compara los planes
       </Text>
 
@@ -123,16 +202,36 @@ export default function PlanesScreen({ route }) {
           },
         ]}
       >
-        <View style={[styles.fila, { borderBottomColor: theme.border }]}>
-          <Text style={[styles.beneficio, { color: theme.secondaryText }]}>
+        <View
+          style={[
+            styles.fila,
+            { borderBottomColor: theme.border },
+          ]}
+        >
+          <Text
+            style={[
+              styles.beneficio,
+              { color: theme.secondaryText },
+            ]}
+          >
             Beneficio
           </Text>
 
-          <Text style={[styles.columna, { color: theme.secondaryText }]}>
+          <Text
+            style={[
+              styles.columnaTexto,
+              { color: theme.secondaryText },
+            ]}
+          >
             Free
           </Text>
 
-          <Text style={[styles.columna, { color: theme.primary }]}>
+          <Text
+            style={[
+              styles.columnaTexto,
+              { color: theme.primary },
+            ]}
+          >
             Plus
           </Text>
         </View>
@@ -148,7 +247,12 @@ export default function PlanesScreen({ route }) {
               },
             ]}
           >
-            <Text style={[styles.beneficio, { color: theme.text }]}>
+            <Text
+              style={[
+                styles.beneficio,
+                { color: theme.text },
+              ]}
+            >
               {item[0]}
             </Text>
 
@@ -163,21 +267,29 @@ export default function PlanesScreen({ route }) {
         ))}
       </View>
 
-      {/* Botón Plus */}
-      {plan === 'plus' ? (
+      {/* Botón */}
+      {esPlus ? (
         <View
           style={[
             styles.boton,
-            { backgroundColor: theme.primarySoft },
+            {
+              backgroundColor: theme.primarySoft,
+              borderColor: theme.primary,
+            },
           ]}
         >
           <Ionicons
             name="checkmark-circle"
-            size={22}
+            size={21}
             color={theme.primary}
           />
 
-          <Text style={[styles.textoActivo, { color: theme.text }]}>
+          <Text
+            style={[
+              styles.textoActivo,
+              { color: theme.primary },
+            ]}
+          >
             Ya tienes Mentalis Plus
           </Text>
         </View>
@@ -185,9 +297,13 @@ export default function PlanesScreen({ route }) {
         <TouchableOpacity
           style={[
             styles.boton,
-            { backgroundColor: theme.primary },
+            {
+              backgroundColor: theme.primary,
+              borderColor: theme.primary,
+            },
           ]}
           onPress={mejorarPlan}
+          activeOpacity={0.8}
         >
           <Ionicons
             name="star"
@@ -216,13 +332,13 @@ const styles = StyleSheet.create({
   },
 
   icono: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 15,
+    marginBottom: 14,
   },
 
   titulo: {
@@ -234,25 +350,45 @@ const styles = StyleSheet.create({
   subtitulo: {
     fontSize: 14,
     textAlign: 'center',
-    marginTop: 7,
+    marginTop: 6,
     marginBottom: 25,
   },
 
   card: {
     borderWidth: 1,
     borderRadius: 14,
-    padding: 15,
+    padding: 16,
     marginBottom: 25,
   },
 
+  planFila: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
   plan: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: 'bold',
     marginTop: 4,
   },
 
+  etiqueta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+
+  etiquetaTexto: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+
   seccion: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
     marginBottom: 12,
   },
@@ -267,30 +403,39 @@ const styles = StyleSheet.create({
   fila: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
   },
 
   beneficio: {
     flex: 2,
-    fontSize: 13,
+    fontSize: 12,
+    paddingRight: 5,
   },
 
   columna: {
     flex: 1,
-    textAlign: 'center',
     alignItems: 'center',
+  },
+
+  columnaTexto: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: 12,
+    fontWeight: '600',
   },
 
   valor: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+    textAlign: 'center',
   },
 
   boton: {
     height: 55,
     borderRadius: 14,
+    borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

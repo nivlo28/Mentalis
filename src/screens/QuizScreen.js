@@ -46,18 +46,25 @@ export default function QuizScreen({ route, navigation }) {
         }
       );
 
-      if (error || !data?.preguntas || data.preguntas.length === 0) {
-        //Alert.alert('Error', 'No se pudo generar el quiz.');
+      if (
+        error ||
+        !data?.preguntas ||
+        data.preguntas.length === 0
+      ) {
         console.log('Error generando quiz:', error);
         console.log('Data quiz:', data);
+
         Alert.alert(
-          error?.message || data?.error || 'No se pudo generar el quiz.'
+          'Error',
+          error?.message ||
+            data?.error ||
+            'No se pudo generar el quiz.'
         );
+
         return;
       }
 
       setPreguntas(data.preguntas);
-
     } catch (error) {
       console.log(error);
     } finally {
@@ -105,6 +112,71 @@ export default function QuizScreen({ route, navigation }) {
     };
   };
 
+  // Actualiza la racha de estudio
+  const actualizarRacha = async (userId) => {
+    try {
+      const hoy = new Date();
+      const hoyTexto = hoy.toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from('perfiles')
+        .select('racha, ultimo_estudio')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.log('Error leyendo racha:', error);
+        return;
+      }
+
+      // Si ya estudió hoy, no suma otra vez
+      if (data?.ultimo_estudio === hoyTexto) {
+        return;
+      }
+
+      let nuevaRacha = 1;
+
+      if (data?.ultimo_estudio) {
+        const ultimo = new Date(
+          data.ultimo_estudio + 'T00:00:00'
+        );
+
+        const hoyLocal = new Date(
+          hoy.getFullYear(),
+          hoy.getMonth(),
+          hoy.getDate()
+        );
+
+        const diferencia = Math.round(
+          (hoyLocal - ultimo) /
+            (1000 * 60 * 60 * 24)
+        );
+
+        // Si estudió ayer, aumenta la racha
+        if (diferencia === 1) {
+          nuevaRacha = (data.racha || 0) + 1;
+        }
+      }
+
+      const { error: errorRacha } = await supabase
+        .from('perfiles')
+        .update({
+          racha: nuevaRacha,
+          ultimo_estudio: hoyTexto,
+        })
+        .eq('user_id', userId);
+
+      if (errorRacha) {
+        console.log(
+          'Error actualizando racha:',
+          errorRacha
+        );
+      }
+    } catch (error) {
+      console.log('Error en racha:', error);
+    }
+  };
+
   // Guarda y vuelve al mapa
   const volverAlMapa = async () => {
     const resultado = obtenerResultado();
@@ -114,7 +186,10 @@ export default function QuizScreen({ route, navigation }) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      Alert.alert('Error', 'No se encontró el usuario.');
+      Alert.alert(
+        'Error',
+        'No se encontró el usuario.'
+      );
       return;
     }
 
@@ -140,9 +215,15 @@ export default function QuizScreen({ route, navigation }) {
 
     if (error) {
       console.log('Error guardando:', error);
-      Alert.alert('Error', 'No se pudo guardar.');
+      Alert.alert(
+        'Error',
+        'No se pudo guardar.'
+      );
       return;
     }
+
+    // Registra el día de estudio
+    await actualizarRacha(user.id);
 
     navigation.popTo('VerMapa', {
       mapaId,
@@ -152,12 +233,15 @@ export default function QuizScreen({ route, navigation }) {
     });
   };
 
+  // Cargando
   if (cargando) {
     return (
       <View
         style={[
           styles.centro,
-          { backgroundColor: theme.background },
+          {
+            backgroundColor: theme.background,
+          },
         ]}
       >
         <ActivityIndicator
@@ -172,6 +256,7 @@ export default function QuizScreen({ route, navigation }) {
     );
   }
 
+  // Quiz terminado
   if (terminado) {
     const resultado = obtenerResultado();
 
@@ -179,7 +264,9 @@ export default function QuizScreen({ route, navigation }) {
       <View
         style={[
           styles.centro,
-          { backgroundColor: theme.background },
+          {
+            backgroundColor: theme.background,
+          },
         ]}
       >
         <Text
@@ -216,7 +303,9 @@ export default function QuizScreen({ route, navigation }) {
         <TouchableOpacity
           style={[
             styles.boton,
-            { backgroundColor: theme.primary },
+            {
+              backgroundColor: theme.primary,
+            },
           ]}
           onPress={volverAlMapa}
         >
@@ -229,29 +318,38 @@ export default function QuizScreen({ route, navigation }) {
   }
 
   const pregunta = preguntas[actual];
+
   if (!pregunta) {
-  return (
-    <View
-      style={[
-        styles.centro,
-        { backgroundColor: theme.background },
-      ]}
-    >
-      <Text style={{ color: theme.text }}>
-        No se pudo cargar la pregunta.
-      </Text>
-    </View>
-  );
-}
+    return (
+      <View
+        style={[
+          styles.centro,
+          {
+            backgroundColor: theme.background,
+          },
+        ]}
+      >
+        <Text style={{ color: theme.text }}>
+          No se pudo cargar la pregunta.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: theme.background },
+        {
+          backgroundColor: theme.background,
+        },
       ]}
     >
-      <Text style={{ color: theme.secondaryText }}>
+      <Text
+        style={{
+          color: theme.secondaryText,
+        }}
+      >
         Pregunta {actual + 1} de {preguntas.length}
       </Text>
 
@@ -303,8 +401,6 @@ export default function QuizScreen({ route, navigation }) {
     </View>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   container: {

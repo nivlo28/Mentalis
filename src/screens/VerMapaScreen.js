@@ -9,6 +9,10 @@ import {
   Text,
   ScrollView,
   StyleSheet,
+  Modal,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,8 +21,16 @@ import ListaEnlazada from '../estructuras/ListaEnlazada';
 import ColaPrioridad from '../estructuras/ColaPrioridad';
 
 import ConceptoCard from '../components/ConceptoCard';
+import ResumenMapa from '../components/ResumenMapa';
+import PrioridadRepaso from '../components/PrioridadRepaso';
 
 import { supabase } from '../services/supabase';
+
+import {
+  puedeExplicar,
+  registrarExplicacion,
+} from '../services/planService';
+
 import { useTheme } from '../context/ThemeContext';
 
 export default function VerMapaScreen({
@@ -35,21 +47,33 @@ export default function VerMapaScreen({
   } = route.params || {};
 
   const [resultados, setResultados] = useState({});
+  const [modal, setModal] = useState(false);
+  const [concepto, setConcepto] = useState('');
+  const [explicacion, setExplicacion] = useState('');
+  const [cargando, setCargando] = useState(false);
 
-  // Carga resultados al entrar o volver del quiz
+  // Actualiza resultados
   useFocusEffect(
     useCallback(() => {
       cargarResultados();
     }, [mapaId])
   );
 
+  // Carga resultados
   const cargarResultados = async () => {
     if (!mapaId) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
 
     const { data, error } = await supabase
       .from('resultados_quiz')
       .select('*')
-      .eq('mapa_id', mapaId);
+      .eq('mapa_id', mapaId)
+      .eq('user_id', user.id);
 
     if (error) {
       console.log('Error cargando:', error);
@@ -65,282 +89,422 @@ export default function VerMapaScreen({
     setResultados(guardados);
   };
 
-  // Crea la lista enlazada
+  // Lista enlazada
   const conceptos = useMemo(() => {
     const lista = new ListaEnlazada();
 
-    mapa?.conceptos?.forEach((concepto) => {
-      lista.insertarFinal(concepto);
+    mapa?.conceptos?.forEach((item) => {
+      lista.insertarFinal(item);
     });
 
     return lista.recorrer();
   }, [mapa]);
 
-  // Crea la cola de prioridad
+  // Cola de prioridad
   const ordenRepaso = useMemo(() => {
     const cola = new ColaPrioridad();
 
-    conceptos.forEach((concepto) => {
-      const resultado =
-        resultados[concepto.nombre];
-
-      let estado = 'sin evaluar';
-      let prioridad = 2;
-
-      if (resultado) {
-        estado = resultado.estado;
-        prioridad = resultado.prioridad;
-      }
+    conceptos.forEach((item) => {
+      const resultado = resultados[item.nombre];
 
       cola.encolar(
         {
-          ...concepto,
-          estado,
+          ...item,
+          estado:
+            resultado?.estado || 'sin evaluar',
           porcentaje: resultado?.porcentaje,
         },
-        prioridad
+        resultado?.prioridad || 2
       );
     });
 
     return cola.recorrer();
   }, [conceptos, resultados]);
 
-  // Guarda el concepto en el historial y abre el quiz
-const abrirQuiz = async (concepto) => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Progreso
+  const progreso = useMemo(() => {
+    if (!conceptos.length) return 0;
 
-  if (!user) {
-    console.log('No se encontró el usuario');
-    return;
-  }
+    const evaluados = conceptos.filter(
+      (item) => resultados[item.nombre]
+    ).length;
 
-  const { error } = await supabase
-    .from('historial_estudio')
-    .insert({
-      user_id: user.id,
-      mapa_id: mapaId,
-      concepto: concepto.nombre,
+    return Math.round(
+      (evaluados / conceptos.length) * 100
+    );
+  }, [conceptos, resultados]);
+
+  // Abre quiz
+  const abrirQuiz = async (item) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      await supabase
+        .from('historial_estudio')
+        .insert({
+          user_id: user.id,
+          mapa_id: mapaId,
+          concepto: item.nombre,
+        });
+    }
+
+    navigation.navigate('Quiz', {
+      mapaId,
+      concepto: item,
+      contenidoFuente,
+      tema,
+      mapa,
     });
+  };
 
-  if (error) {
-    console.log('Error guardando historial:', error);
-  }
+  // Abre examen
+  const abrirExamen = () => {
+    navigation.navigate('Examen', {
+      mapaId,
+      tema,
+      mapa,
+      contenidoFuente,
+    });
+  };
 
-  navigation.navigate('Quiz', {
-    mapaId,
-    concepto,
-    contenidoFuente,
-    tema,
-    mapa,
-  });
-};
+  // Explícamelo fácil
+  const explicar = async (item) => {
+    try {
+      // Revisa límite Free
+      const permiso = await puedeExplicar();
+
+      if (permiso.error) {
+        Alert.alert(
+          'Error',
+          'No se pudo verificar tu plan.'
+        );
+
+        return;
+      }
+
+      if (!permiso.permitido) {
+        Alert.alert(
+          'Límite diario',
+          `Tu plan Free permite ${permiso.limite} explicaciones al día.`
+        );
+
+        return;
+      }
+
+      setConcepto(item.nombre);
+      setExplicacion('');
+      setModal(true);
+      setCargando(true);
+
+      // Genera explicación
+      const { data, error } =
+        await supabase.functions.invoke(
+          'explicar-concepto',
+          {
+            body: {
+              concepto: item.nombre,
+              contenido_fuente: contenidoFuente,
+            },
+          }
+        );
+
+      if (error || !data?.explicacion) {
+        setModal(false);
+
+        Alert.alert(
+          'Error',
+          'No se pudo generar la explicación.'
+        );
+
+        return;
+      }
+
+      // Solo cuenta si funcionó
+      await registrarExplicacion();
+
+      setExplicacion(data.explicacion);
+    } catch (error) {
+      console.log(error);
+
+      setModal(false);
+
+      Alert.alert(
+        'Error',
+        'Ocurrió un problema.'
+      );
+    } finally {
+      setCargando(false);
+    }
+  };
 
   return (
-    <ScrollView
-      style={[
-        styles.container,
-        { backgroundColor: theme.background },
-      ]}
-      contentContainerStyle={styles.contenido}
-    >
-      <Text
-        style={[
-          styles.titulo,
-          { color: theme.text },
-        ]}
-      >
-        {tema}
-      </Text>
-
-      {/* Información */}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          },
-        ]}
+    <>
+      <ScrollView
+        style={{
+          flex: 1,
+          backgroundColor: theme.background,
+        }}
+        contentContainerStyle={styles.contenido}
+        showsVerticalScrollIndicator={false}
       >
         <Text
           style={[
-            styles.cardTitulo,
+            styles.titulo,
             { color: theme.text },
           ]}
         >
-          Mapa de conceptos
+          {tema}
         </Text>
 
         <Text
-          style={{
-            color: theme.secondaryText,
-          }}
+          style={[
+            styles.descripcion,
+            { color: theme.secondaryText },
+          ]}
         >
-          {conceptos.length} conceptos
+          Tu mapa de conocimiento
         </Text>
-      </View>
 
-      <Text
-        style={[
-          styles.subtitulo,
-          { color: theme.text },
-        ]}
-      >
-        Conceptos
-      </Text>
+        <ResumenMapa
+          conceptos={conceptos.length}
+          progreso={progreso}
+          onExamen={abrirExamen}
+        />
 
-      {/* Conceptos */}
-      {conceptos.map((concepto, index) => (
-        <View key={index}>
-          <ConceptoCard
-            numero={index + 1}
-            concepto={concepto}
-            onPress={() => abrirQuiz(concepto)}
-          />
+        <View style={styles.header}>
+          <Text
+            style={[
+              styles.subtitulo,
+              { color: theme.text },
+            ]}
+          >
+            Conceptos
+          </Text>
 
-          {index < conceptos.length - 1 && (
-            <View
-              style={[
-                styles.linea,
-                { backgroundColor: theme.border },
-              ]}
-            />
-          )}
+          <Text
+            style={[
+              styles.ayudaHeader,
+              { color: theme.secondaryText },
+            ]}
+          >
+            Toca para practicar
+          </Text>
         </View>
-      ))}
 
-      <Text
-        style={[
-          styles.subtitulo,
-          styles.espacio,
-          { color: theme.text },
-        ]}
-      >
-        Prioridad de repaso
-      </Text>
-
-      {/* Cola de prioridad */}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          },
-        ]}
-      >
-        {ordenRepaso.map((item, index) => (
-          <View
+        {conceptos.map((item, index) => (
+          <ConceptoCard
             key={index}
-            style={styles.repaso}
+            numero={index + 1}
+            concepto={item}
+            onPress={() => abrirQuiz(item)}
+            onExplicar={() => explicar(item)}
+          />
+        ))}
+
+        <Text
+          style={[
+            styles.subtitulo,
+            styles.prioridad,
+            { color: theme.text },
+          ]}
+        >
+          Prioridad de repaso
+        </Text>
+
+        <Text
+          style={[
+            styles.ayuda,
+            { color: theme.secondaryText },
+          ]}
+        >
+          Estudia primero lo que necesita más práctica
+        </Text>
+
+        <PrioridadRepaso datos={ordenRepaso} />
+      </ScrollView>
+
+      {/* Modal explicación */}
+      <Modal
+        visible={modal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModal(false)}
+      >
+        <View style={styles.fondo}>
+          <View
+            style={[
+              styles.modal,
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+              },
+            ]}
           >
             <Text
               style={[
-                styles.numero,
+                styles.modalTitulo,
+                { color: theme.text },
+              ]}
+            >
+              ✨ Explícamelo fácil
+            </Text>
+
+            <Text
+              style={[
+                styles.concepto,
                 { color: theme.primary },
               ]}
             >
-              {index + 1}
+              {concepto}
             </Text>
 
-            <View>
-              <Text
-                style={[
-                  styles.nombre,
-                  { color: theme.text },
-                ]}
-              >
-                {item.valor.nombre}
-              </Text>
+            {cargando ? (
+              <View style={styles.cargando}>
+                <ActivityIndicator
+                  size="large"
+                  color={theme.primary}
+                />
 
-              <Text
-                style={[
-                  styles.estado,
-                  {
+                <Text
+                  style={{
                     color: theme.secondaryText,
-                  },
-                ]}
-              >
-                {item.valor.estado}
-                {item.valor.porcentaje !== undefined
-                  ? ` - ${item.valor.porcentaje}%`
-                  : ''}
-              </Text>
-            </View>
+                    marginTop: 10,
+                  }}
+                >
+                  Generando explicación...
+                </Text>
+              </View>
+            ) : (
+              <>
+                <ScrollView
+                  style={styles.explicacionScroll}
+                >
+                  <Text
+                    style={[
+                      styles.explicacion,
+                      { color: theme.text },
+                    ]}
+                  >
+                    {explicacion}
+                  </Text>
+                </ScrollView>
+
+                <TouchableOpacity
+                  style={[
+                    styles.boton,
+                    {
+                      backgroundColor:
+                        theme.primary,
+                    },
+                  ]}
+                  onPress={() => setModal(false)}
+                >
+                  <Text style={styles.botonTexto}>
+                    Entendido
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-        ))}
-      </View>
-    </ScrollView>
+        </View>
+      </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
   contenido: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 45,
   },
 
   titulo: {
     fontSize: 28,
     fontWeight: 'bold',
+  },
+
+  descripcion: {
+    fontSize: 13,
+    marginTop: 4,
     marginBottom: 20,
   },
 
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+
   subtitulo: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: 'bold',
-    marginBottom: 15,
   },
 
-  card: {
-    borderWidth: 1,
-    borderRadius: 15,
-    padding: 18,
-    marginBottom: 25,
+  ayudaHeader: {
+    fontSize: 12,
   },
 
-  cardTitulo: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-
-  linea: {
-    width: 2,
-    height: 20,
-    alignSelf: 'center',
-  },
-
-  espacio: {
+  prioridad: {
     marginTop: 30,
   },
 
-  repaso: {
-    flexDirection: 'row',
+  ayuda: {
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+
+  fondo: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: 22,
+  },
+
+  modal: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 20,
+  },
+
+  modalTitulo: {
+    fontSize: 19,
+    fontWeight: 'bold',
+  },
+
+  concepto: {
+    fontWeight: '600',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+
+  cargando: {
+    height: 130,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
   },
 
-  numero: {
-    width: 35,
-    fontSize: 20,
+  explicacionScroll: {
+    maxHeight: 280,
+  },
+
+  explicacion: {
+    fontSize: 15,
+    lineHeight: 23,
+  },
+
+  boton: {
+    padding: 14,
+    borderRadius: 11,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+
+  botonTexto: {
+    color: '#FFFFFF',
     fontWeight: 'bold',
-  },
-
-  nombre: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
-  estado: {
-    fontSize: 13,
-    marginTop: 2,
-    textTransform: 'capitalize',
   },
 });

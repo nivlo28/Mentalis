@@ -14,6 +14,7 @@ export default function ConceptoCard({
   concepto,
   numero,
   onPress,
+  onExplicar,
 }) {
   const { theme } = useTheme();
 
@@ -65,6 +66,30 @@ export default function ConceptoCard({
             ? `Requiere: ${concepto.requiere.join(', ')}`
             : 'Sin prerrequisitos'}
         </Text>
+
+        {/* Explicación con IA */}
+        <TouchableOpacity
+          style={styles.explicar}
+          onPress={(event) => {
+            event.stopPropagation();
+            onExplicar();
+          }}
+        >
+          <Ionicons
+            name="sparkles"
+            size={14}
+            color={theme.primary}
+          />
+
+          <Text
+            style={[
+              styles.explicarTexto,
+              { color: theme.primary },
+            ]}
+          >
+            Explícamelo fácil
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <Ionicons
@@ -79,7 +104,7 @@ export default function ConceptoCard({
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    minHeight: 75,
+    minHeight: 90,
     borderWidth: 1,
     borderRadius: 14,
     padding: 14,
@@ -115,5 +140,18 @@ const styles = StyleSheet.create({
   requiere: {
     fontSize: 12,
     lineHeight: 17,
+  },
+
+  explicar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+
+  explicarTexto: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

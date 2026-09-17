@@ -6,7 +6,9 @@ import {
   DefaultTheme,
 } from '@react-navigation/native';
 
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import {
+  createNativeStackNavigator,
+} from '@react-navigation/native-stack';
 
 import {
   View,
@@ -16,19 +18,29 @@ import {
 
 import { supabase } from './src/services/supabase';
 
+// Screens
 import LoginScreen from './src/screens/LoginScreen';
 import RegistroScreen from './src/screens/RegistroScreen';
 import VerMapaScreen from './src/screens/VerMapaScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import CentroEstudioScreen from './src/screens/CentroEstudioScreen';
 import PlanesScreen from './src/screens/PlanesScreen';
+import RetoDiarioScreen from './src/screens/RetoDiarioScreen';
+import ExamenScreen from './src/screens/ExamenScreen';
 
+// Navegación
 import TabNavigator from './src/navigation/TabNavigator';
 
+// Tema
 import {
   ThemeProvider,
   useTheme,
 } from './src/context/ThemeContext';
+
+// Plan Free / Plus
+import {
+  PlanProvider,
+} from './src/context/PlanContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -38,7 +50,7 @@ function AppContenido() {
 
   const { theme, modoOscuro } = useTheme();
 
-  // Revisa si hay una sesión iniciada
+  // Revisa si existe una sesión
   useEffect(() => {
     async function revisarSesion() {
       try {
@@ -57,6 +69,7 @@ function AppContenido() {
 
     revisarSesion();
 
+    // Detecta login o logout
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
@@ -85,6 +98,7 @@ function AppContenido() {
     },
   };
 
+  // Pantalla de carga
   if (cargando) {
     return (
       <View
@@ -117,6 +131,7 @@ function AppContenido() {
       <Stack.Navigator>
         {haySesion ? (
           <>
+            {/* Menú principal */}
             <Stack.Screen
               name="Menu"
               component={TabNavigator}
@@ -125,6 +140,7 @@ function AppContenido() {
               }}
             />
 
+            {/* Mapa */}
             <Stack.Screen
               name="VerMapa"
               component={VerMapaScreen}
@@ -137,6 +153,7 @@ function AppContenido() {
               }}
             />
 
+            {/* Quiz */}
             <Stack.Screen
               name="Quiz"
               component={QuizScreen}
@@ -149,11 +166,42 @@ function AppContenido() {
               }}
             />
 
+            {/* Reto diario */}
+            <Stack.Screen
+              name="RetoDiario"
+              component={RetoDiarioScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+
+            {/* Modo examen */}
+            <Stack.Screen
+              name="Examen"
+              component={ExamenScreen}
+              options={{
+                title: 'Modo examen',
+                headerStyle: {
+                  backgroundColor: theme.card,
+                },
+                headerTintColor: theme.text,
+              }}
+            />
+
+            {/* Centro de estudio */}
             <Stack.Screen
               name="CentroEstudio"
               component={CentroEstudioScreen}
+              options={{
+                title: 'Centro de estudio',
+                headerStyle: {
+                  backgroundColor: theme.card,
+                },
+                headerTintColor: theme.text,
+              }}
             />
 
+            {/* Planes */}
             <Stack.Screen
               name="Planes"
               component={PlanesScreen}
@@ -168,6 +216,7 @@ function AppContenido() {
           </>
         ) : (
           <>
+            {/* Login */}
             <Stack.Screen
               name="Login"
               component={LoginScreen}
@@ -176,6 +225,7 @@ function AppContenido() {
               }}
             />
 
+            {/* Registro */}
             <Stack.Screen
               name="Registro"
               component={RegistroScreen}
@@ -193,7 +243,9 @@ function AppContenido() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContenido />
+      <PlanProvider>
+        <AppContenido />
+      </PlanProvider>
     </ThemeProvider>
   );
 }
