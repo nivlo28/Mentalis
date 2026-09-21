@@ -6,10 +6,13 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+
     "ios": {
       "supportsTablet": true
     },
+
     "android": {
+      "package": "com.mentalis.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -17,12 +20,20 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }
     },
+
     "web": {
       "favicon": "./assets/favicon.png"
     },
+
     "plugins": [
       "expo-font",
       "expo-asset"
-    ]
+    ],
+
+    "extra": {
+      "eas": {
+        "projectId": "e45cc8fa-5981-487c-843a-72ab6a696da0"
+      }
+    }
   }
 }
